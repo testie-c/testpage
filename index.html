@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Minimalist Page</title>
+ <style>
+ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; background-color: #f0f0f0; color: #333; margin: 0; line-height: 1.6; font-size: 0.9rem; }
+ main { max-width: 800px; margin: 0 auto; padding: 4rem 1.5rem 2rem; }
+ h1, h2 { font-weight: 300; }
+ p { font-weight: 300; }
+ .content-section { margin-bottom: 2rem; }
+ </style>
+</head>
+<body>
+ <div id="header-placeholder"></div>
+
+ <main>
+ <div class="content-section">
+ <h1>About This Page</h1>
+ <p>
+ This is a simple, monochrome HTML page designed for testing header integration. It is intentionally minimal, focusing on content structure to ensure that the dynamically loaded header does not interfere with the main layout.
+ </p>
+ </div>
+
+ <div class="content-section">
+ <h2>Our Mission</h2>
+ <p>
+ Our mission is to build clean and accessible web solutions. We believe in simplicity and functionality, creating digital experiences that are intuitive and reliable for all users.
+ </p>
+ <p>
+ This page serves as a testbed for a reusable header component. By separating the header logic from the main content, we can maintain consistency and simplify site-wide updates.
+ </p>
+ </div>
+
+ <div class="content-section">
+ <h2>Contact Us</h2>
+ <p>
+ If you have any questions or feedback, please feel free to reach out. We are always looking for ways to improve and provide a better experience.
+ </p>
+ <p>
+ Thank you for visiting.
+ </p>
+ </div>
+ </main>
+<script src="https://testie-c.github.io/header/loadHeader.js"></script>  
+</body>
+</html>
