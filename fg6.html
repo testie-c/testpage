@@ -1,3 +1,10 @@
+さっきのコードについて、自動更新オフ時は静的表示、オン時は動的表示になるように修正したいと思ってる。
+具体的には、
+* 自動更新オフ時: EOSEを受信したらCLOSEして、それ以降のイベントは無視（描画しない）。
+* 自動更新オン時: REQを投げっぱなしでEOSEでもCLOSEしない。定期的なsetIntervalのREQは不要。
+「もっと見る」ボタンは、どちらのモードでも古いイベントを一度だけ取得するようにしたい。
+そんなことって可能？現在のhtmlは以下のとおりです。
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -16,6 +23,7 @@ let events = [];
 let latestSeen = 0;
 let oldestSeen = Infinity;
 let autoUpdate = true;
+let activeSubscriptions = new Set();
 
 document.getElementById('subscribe-relay').addEventListener('click', () => {
   const url = document.getElementById('relay-url').value || 'wss://r.kojira.io';
@@ -27,7 +35,10 @@ document.getElementById('newevent-auto-loading').addEventListener('change', (e) 
 });
 
 document.getElementById('load-more').addEventListener('click', () => {
-  fetchOlderEvents();
+  const subId = 'older-' + Date.now();
+  activeSubscriptions.add(subId);
+  const req = ["REQ", subId, { kinds: [1], until: oldestSeen - 1, limit: 10 }];
+  relay.send(JSON.stringify(req));
 });
 
 function connectToRelay(url) {
@@ -36,40 +47,37 @@ function connectToRelay(url) {
 
   relay.onopen = () => {
     console.log('接続しました:', url);
-    requestInitialEvents();
+    const subId = autoUpdate ? 'live' : 'init';
+    activeSubscriptions.add(subId);
+    const req = ["REQ", subId, { kinds: [1], limit: 50 }];
+    relay.send(JSON.stringify(req));
   };
 
   relay.onmessage = (msg) => {
     const data = JSON.parse(msg.data);
-    if (data[0] === "EVENT") {
+    const type = data[0];
+    const subId = data[1];
+
+    if (!activeSubscriptions.has(subId)) return;
+
+    if (type === "EVENT") {
       const event = data[2];
       if (event.kind === 1) handleEvent(event);
+    }
+
+    if (type === "EOSE") {
+      if (!autoUpdate && subId === 'init') {
+        relay.send(JSON.stringify(["CLOSE", subId]));
+        activeSubscriptions.delete(subId);
+      }
     }
   };
 
   relay.onerror = (err) => console.error('接続エラー:', err);
 }
 
-function requestInitialEvents() {
-  const req = [
-    "REQ",
-    "init",
-    { kinds: [1], limit: 50, since: 0 }
-  ];
-  relay.send(JSON.stringify(req));
-}
-
-function fetchOlderEvents() {
-  const req = [
-    "REQ",
-    "older",
-    { kinds: [1], until: oldestSeen - 1, limit: 10 }
-  ];
-  relay.send(JSON.stringify(req));
-}
-
 function handleEvent(event) {
-  if (events.find(e => e.id === event.id)) return; // 重複防止
+  if (events.find(e => e.id === event.id)) return;
 
   events.push(event);
   latestSeen = Math.max(latestSeen, event.created_at);
@@ -91,18 +99,6 @@ function renderEvent(event, mode = 'append') {
     container.appendChild(div);
   }
 }
-
-// 自動更新チェック
-setInterval(() => {
-  if (relay && autoUpdate) {
-    const req = [
-      "REQ",
-      "latest",
-      { kinds: [1], since: latestSeen + 1, limit: 5 }
-    ];
-    relay.send(JSON.stringify(req));
-  }
-}, 5000);
 </script>
 </body>
 </html>
