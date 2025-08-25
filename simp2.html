@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>flowgazer</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<style>
+ body {font-size: 0.7rem;color:#666;}
+</style>
 </head>
 <body>
 <div id="header-placeholder"></div>
@@ -50,7 +54,6 @@
 <ul id="timeline"></ul>
 <button type="button" id="load-more" class="loading full-width">もっと見る</button>
 <button id="cancel-loading" style="display: none; background-color:#bbddff;" class="full-width">あきらめる</button>
-<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
 <script>
 String.prototype.padStart = String.prototype.padStart ? String.prototype.padStart : function(targetLength, padString) {
   targetLength = Math.floor(targetLength) || 0;
@@ -1014,7 +1017,8 @@ function checkForAutoLoad() {
     document.getElementById('cancel-loading').style.display = 'none';
   }
 }
-</script><script>
+</script>
+<script>
 document.getElementById('auto-update-toggle').addEventListener('change', function() {
   if (this.checked) {
     // 自動更新ON → リレーに再接続してイベント購読を再開
@@ -1024,14 +1028,13 @@ document.getElementById('auto-update-toggle').addEventListener('change', functio
     subscribeRelay(rurl, filteredAuthors); // フィルターがあれば渡す
     localStorage.setItem(LS_RELAY_URL_KEY, rurl);
   } else {
-    // 自動更新OFF → stop.jsを読み込む
-    loadScript('./stop.js', () => {
-      if (typeof stopAutoLoading === 'function') {
-        stopAutoLoading();
-      }
-    });
+    // 自動更新OFF → stop.jsの関数を直接呼び出す
+    if (typeof stopAutoLoading === 'function') {
+      stopAutoLoading();
+    }
   }
 });
+src="./stop.js"
 </script>
 </body>
 </html>
