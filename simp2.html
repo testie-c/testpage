@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>testpage</title>
+</head>
+<body>
+<div class="container" style="width:360px;">
+  <h1 style="font-size;0.9rem;">testpage</h1>
+  <div class="flex-container">
+    <button id="generate-keypair" class="full-width">新しい鍵ペアを生成して試す</button>
+    <button id="get-from-extension" class="full-width">ブラウザ拡張機能からログイン</button>
+  </div>
+  <span>秘密鍵（nsec）:</span>
+  <input id="nsec" type="text" placeholder="nsec1..." class="full-width">
+  <p class="hidden">⚠️秘密鍵を紛失すると、そのアカウントは二度と使えません。大事にしてね。</p>
+  <span>公開鍵（npub）:</span><a id="npub-link" class="npub-link" target="_blank" rel="noreferrer"></a>
+  <textarea id="new-post-content" rows="3" placeholder="いまなにしてる？" class="full-width"></textarea>
+  <button id="send-new-post" class="full-width">投稿</button>
+  <input id="relay-url" type="text" placeholder="wss://r.kojira.io"><button id="subscribe-relay">接続</button>
+  <label><input type="checkbox" id="newevent-auto-loading" checked>自動更新</label>
+</div>
+<div id="event-list"></div>
+<button type="button" id="load-more">もっと見る</button>
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script>
+let relay;
+let events = [];
+let latestSeen = 0;
+let oldestSeen = Infinity;
+let autoUpdate = true;
+let activeSubscriptions = new Set();
+let currentSubId = 'init';
+let profiles = {};
+let pubkeysToFetch = new Set();
+let nostrSigner = null;
+
+const nsecInput = document.getElementById('nsec');
+const npubLink = document.getElementById('npub-link');
+const warningMessageArea = document.getElementById('warning-message');
+const postContentInput = document.getElementById('new-post-content');
+const sendPostButton = document.getElementById('send-new-post');
+const generateButton = document.getElementById("generate-keypair");
+const getFromExtensionButton = document.getElementById('get-from-extension');
+const relayUrlInput = document.getElementById('relay-url');
+
+document.getElementById('subscribe-relay').addEventListener('click', () => {
+  const url = relayUrlInput.value || 'wss://r.kojira.io';
+  connectToRelay(url);
+});
+
+document.getElementById('newevent-auto-loading').addEventListener('change', (e) => {
+  autoUpdate = e.target.checked;
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    if (activeSubscriptions.has(currentSubId)) {
+      relay.send(JSON.stringify(["CLOSE", currentSubId]));
+      activeSubscriptions.delete(currentSubId);
+    }
+    events = [];
+    document.getElementById('event-list').innerHTML = '';
+    latestSeen = 0;
+    oldestSeen = Infinity;
+    requestNewEvents();
+  }
+});
+
+document.getElementById('load-more').addEventListener('click', () => {
+  const subId = 'older-' + Date.now();
+  activeSubscriptions.add(subId);
+  const req = ["REQ", subId, { kinds: [1], until: oldestSeen - 1, limit: 10 }];
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    relay.send(JSON.stringify(req));
+  }
+});
+
+function connectToRelay(url) {
+  if (relay) relay.close();
+  relay = new WebSocket(url);
+  events = [];
+  document.getElementById('event-list').innerHTML = '';
+  latestSeen = 0;
+  oldestSeen = Infinity;
+  profiles = {};
+  pubkeysToFetch = new Set();
+
+  relay.onopen = () => {
+    console.log('接続しました:', url);
+    requestNewEvents();
+  };
+
+  relay.onmessage = (msg) => {
+    try {
+      const data = JSON.parse(msg.data);
+      const type = data[0];
+      const subId = data[1];
+
+      if (!activeSubscriptions.has(subId)) return;
+
+      if (type === "EVENT") {
+        const event = data[2];
+        onEvent(event);
+      } else if (type === "EOSE") {
+        if (subId === 'init' || subId.startsWith('older-')) {
+          relay.send(JSON.stringify(["CLOSE", subId]));
+          activeSubscriptions.delete(subId);
+          fetchProfiles();
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  relay.onerror = (err) => console.error('接続エラー:', err);
+}
+
+function requestNewEvents() {
+  currentSubId = autoUpdate ? 'live' : 'init';
+  activeSubscriptions.add(currentSubId);
+  
+  let filter;
+  if (autoUpdate) {
+    filter = { kinds: [0, 1] };
+  } else {
+    filter = { kinds: [0, 1], limit: 50 };
+  }
+  
+  const req = ["REQ", currentSubId, filter];
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    relay.send(JSON.stringify(req));
+  }
+}
+
+function onEvent(event) {
+  if (!window.NostrTools.verifyEvent(event)) {
+    console.error("nostr event with invalid signature:", event);
+    return;
+  }
+  
+  if (event.kind === 0) {
+    try {
+      profiles[event.pubkey] = JSON.parse(event.content);
+      refreshTimeline();
+    } catch (e) {
+      console.error("Failed to parse profile content:", e);
+    }
+    return;
+  }
+  
+  if (event.kind !== 1) {
+    return;
+  }
+  
+  if (events.find(e => e.id === event.id)) return;
+  
+  events.push(event);
+  latestSeen = Math.max(latestSeen, event.created_at);
+  oldestSeen = Math.min(oldestSeen, event.created_at);
+  pubkeysToFetch.add(event.pubkey);
+  
+  refreshTimeline();
+}
+
+function refreshTimeline() {
+  const container = document.getElementById('event-list');
+  container.innerHTML = '';
+  
+  const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
+  sortedEvents.forEach(e => {
+    if (e.kind === 1) {
+      const eventView = postEventView(e);
+      container.appendChild(eventView);
+    }
+  });
+}
+
+function fetchProfiles() {
+  if (pubkeysToFetch.size === 0) return;
+
+  const profileRelayWS = new WebSocket("wss://relay.nostr.band");
+  profileRelayWS.onopen = () => {
+    const pubkeysArray = Array.from(pubkeysToFetch);
+    profileRelayWS.send(JSON.stringify(["REQ", "profile-fetch", { kinds: [0], authors: pubkeysArray }]));
+  };
+
+  profileRelayWS.onmessage = (msg) => {
+    try {
+      const data = JSON.parse(msg.data);
+      const type = data[0];
+      if (type === "EVENT" && data[2].kind === 0) {
+        const profileEvent = data[2];
+        profiles[profileEvent.pubkey] = JSON.parse(profileEvent.content);
+        pubkeysToFetch.delete(profileEvent.pubkey);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  profileRelayWS.onclose = () => {
+    refreshTimeline();
+  };
+}
+
+// ヘルパー関数群
+function formatTimestamp(unixtime) {
+  const date = new Date(unixtime * 1000);
+  return date.toLocaleTimeString();
+}
+
+function pubkeyView(pubkey) {
+  const npub = window.NostrTools.nip19.npubEncode(pubkey);
+  const displayName = profiles[pubkey] && profiles[pubkey].name ? profiles[pubkey].name : pubkey.substring(0, 8);
+  const a = document.createElement("a");
+  a.href = "https://nostter.app/" + npub;
+  a.target = "_blank";
+  a.rel = "noreferrer";
+  a.textContent = displayName;
+  return a;
+}
+
+function metadataView(nostrEv) {
+  const view = document.createElement("div");
+  view.classList.add("event-metadata");
+  view.appendChild(document.createTextNode(`[${formatTimestamp(nostrEv.created_at)}] `));
+  view.appendChild(pubkeyView(nostrEv.pubkey));
+  view.appendChild(document.createTextNode(" > "));
+  return view;
+}
+
+function postEventView(nostrEv) {
+  const view = document.createElement("div");
+  view.classList.add("event-item");
+  view.appendChild(metadataView(nostrEv));
+  
+  const contentDiv = document.createElement("div");
+  contentDiv.classList.add("event-content");
+  contentDiv.textContent = nostrEv.content;
+  view.appendChild(contentDiv);
+  return view;
+}
+
+
+// 新しい機能の追加
+generateButton.addEventListener("click", () => {
+  const seckey = window.NostrTools.generateSecretKey();
+  const pubkey = window.NostrTools.getPublicKey(seckey);
+  nsecInput.value = window.NostrTools.nip19.nsecEncode(seckey);
+  nsecInput.readOnly = false;
+  npubLink.textContent = window.NostrTools.nip19.npubEncode(pubkey);
+  npubLink.href = "https://nostter.app/" + npubLink.textContent;
+  npubLink.style.display = "inline";
+  warningMessageArea.classList.remove("hidden");
+});
+
+getFromExtensionButton.addEventListener('click', async () => {
+  if (!window.nostr) {
+    alert('NIP-07対応のブラウザ拡張機能が見つかりません。');
+    return;
+  }
+  try {
+    const pubkeyHex = await window.nostr.getPublicKey();
+    const npub = window.NostrTools.nip19.npubEncode(pubkeyHex);
+    nsecInput.value = '********';
+    nsecInput.readOnly = true;
+    nsecInput.placeholder = 'ブラウザ拡張機能でログイン中';
+    npubLink.textContent = npub;
+    npubLink.href = 'https://nostter.app/' + npub;
+    npubLink.style.display = 'inline';
+    warningMessageArea.classList.add('hidden');
+    nostrSigner = window.nostr;
+    alert('ブラウザ拡張機能から公開鍵を取得しました！これで投稿できます。');
+  } catch (error) {
+    console.error('NIP-07拡張機能からの公開鍵取得に失敗しました:', error);
+    alert('公開鍵の取得に失敗しました。拡張機能が有効になっているか確認してください。');
+  }
+});
+
+sendPostButton.addEventListener("click", async () => {
+  const content = postContentInput.value;
+  if (!content) {
+    alert("投稿内容を入力してください。");
+    return;
+  }
+
+  try {
+    let signedPost;
+    if (nostrSigner) {
+      const pubkeyHex = await nostrSigner.getPublicKey();
+      const post = {
+        kind: 1,
+        content: content,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ["client", "flowgazer"]
+        ],
+        pubkey: pubkeyHex,
+      };
+      signedPost = await nostrSigner.signEvent(post);
+    } else {
+      const nsec = nsecInput.value;
+      if (!nsec || nsec === '********') {
+        alert("秘密鍵を入力してください。");
+        return;
+      }
+      const nsecDecoded = window.NostrTools.nip19.decode(nsec);
+      if (nsecDecoded.type !== "nsec") {
+        alert("無効な秘密鍵です。");
+        return;
+      }
+      const seckey = nsecDecoded.data;
+      const post = {
+        kind: 1,
+        content: content,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ["client", "flowgazer"]
+        ],
+      };
+      signedPost = window.NostrTools.finalizeEvent(post, seckey);
+    }
+    
+    if (relay && relay.readyState === WebSocket.OPEN) {
+      relay.send(JSON.stringify(["EVENT", signedPost]));
+      postContentInput.value = "";
+      alert('投稿に成功しました！');
+    } else {
+      alert('リレーに接続していません。投稿に失敗しました。');
+    }
+  } catch (err) {
+    console.error(err);
+    alert("投稿に失敗しました。");
+  }
+});
+
+// nsec入力欄の変更を監視し、npubを自動生成する
+nsecInput.addEventListener("input", function() {
+  const nsecValue = nsecInput.value.trim();
+  if (nsecValue) {
+    try {
+      const nsecDecoded = window.NostrTools.nip19.decode(nsecValue);
+      if (nsecDecoded.type === 'nsec') {
+        const seckey = nsecDecoded.data;
+        const pubkey = window.NostrTools.getPublicKey(seckey);
+        const npub = window.NostrTools.nip19.npubEncode(pubkey);
+        npubLink.textContent = npub;
+        npubLink.href = "https://nostter.app/" + npub;
+        npubLink.style.display = "inline";
+        nostrSigner = null;
+        return;
+      }
+    } catch (e) {
+      // 無効なnsecの場合
+    }
+  }
+  npubLink.textContent = '';
+  npubLink.href = '';
+  npubLink.style.display = 'none';
+  nostrSigner = null;
+});
+</script>
+</body>
+</html>
