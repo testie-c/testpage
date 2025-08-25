@@ -10,7 +10,7 @@
 <body>
 <div id="header-placeholder"></div>
 <div class="container">
-<a href="https://github.com/ompomz/ompomz.github.io/tree/main/flowgazer"><h1>flowgazer</h1></a>
+<a href="https://github.com/ompomz/flowgazer"><h1>flowgazer</h1></a>
 <p>このページでは、鍵を作って・投稿して・タイムラインを見ることができるよ。作ったのはGemini。</p>
 <div class="flex-container">
 <button id="generate-keypair" style="flex-grow:1;">新しい鍵ペアを生成して試す</button>
@@ -44,16 +44,14 @@
 <div class="flex-container">
 <textarea id="hex-filter" rows="3" placeholder="hex, npub1..., ..."></textarea>
 <div class="flex-container-matome">
-<button id="apply-filter">適用</button>
-<button id="clear-filter" style="padding:0.25rem 0.6rem;">クリア</button>
+<button id="apply-filter" style="padding:0.25rem 0rem; width:5rem;">適用</button>
+<button id="clear-filter" style="padding:0.25rem 0rem; width:5rem;">クリア</button>
 </div></div>
 </div>
 </div>
 <ul id="timeline"></ul>
 <button type="button" id="load-more" class="loading full-width">もっと見る</button>
-<div id="status-area">
-<span id="checking-datetime"></span><button id="cancel-loading" style="display: none;">あきらめる</button>
-</div>
+<button id="cancel-loading" style="display: none; background-color:#bbddff;" class="full-width">あきらめる</button>
 <script>
 String.prototype.padStart = String.prototype.padStart ? String.prototype.padStart : function(targetLength, padString) {
   targetLength = Math.floor(targetLength) || 0;
