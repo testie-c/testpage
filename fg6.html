@@ -17,6 +17,7 @@ let latestSeen = 0;
 let oldestSeen = Infinity;
 let autoUpdate = true;
 let activeSubscriptions = new Set();
+let currentSubId = 'init';
 
 document.getElementById('subscribe-relay').addEventListener('click', () => {
   const url = document.getElementById('relay-url').value || 'wss://r.kojira.io';
@@ -25,13 +26,28 @@ document.getElementById('subscribe-relay').addEventListener('click', () => {
 
 document.getElementById('newevent-auto-loading').addEventListener('change', (e) => {
   autoUpdate = e.target.checked;
+  // チェックボックスの状態が変わったら、現在の購読を閉じ、新しい購読を開始する
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    if (activeSubscriptions.has(currentSubId)) {
+      relay.send(JSON.stringify(["CLOSE", currentSubId]));
+      activeSubscriptions.delete(currentSubId);
+    }
+    // タイムラインをリセットして再接続
+    events = [];
+    document.getElementById('event-list').innerHTML = '';
+    latestSeen = 0;
+    oldestSeen = Infinity;
+    requestNewEvents();
+  }
 });
 
 document.getElementById('load-more').addEventListener('click', () => {
   const subId = 'older-' + Date.now();
   activeSubscriptions.add(subId);
   const req = ["REQ", subId, { kinds: [1], until: oldestSeen - 1, limit: 10 }];
-  relay.send(JSON.stringify(req));
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    relay.send(JSON.stringify(req));
+  }
 });
 
 function connectToRelay(url) {
@@ -40,10 +56,7 @@ function connectToRelay(url) {
 
   relay.onopen = () => {
     console.log('接続しました:', url);
-    const subId = autoUpdate ? 'live' : 'init';
-    activeSubscriptions.add(subId);
-    const req = ["REQ", subId, { kinds: [1], limit: 50 }];
-    relay.send(JSON.stringify(req));
+    requestNewEvents();
   };
 
   relay.onmessage = (msg) => {
@@ -59,7 +72,8 @@ function connectToRelay(url) {
     }
 
     if (type === "EOSE") {
-      if (!autoUpdate && subId === 'init') {
+      // 'init'または'older'購読の場合は明示的に閉じる
+      if (subId === 'init' || subId.startsWith('older-')) {
         relay.send(JSON.stringify(["CLOSE", subId]));
         activeSubscriptions.delete(subId);
       }
@@ -69,6 +83,26 @@ function connectToRelay(url) {
   relay.onerror = (err) => console.error('接続エラー:', err);
 }
 
+function requestNewEvents() {
+  currentSubId = autoUpdate ? 'live' : 'init';
+  activeSubscriptions.add(currentSubId);
+  
+  let filter;
+  if (autoUpdate) {
+    // 自動更新モード: 継続的な購読
+    filter = { kinds: [1] };
+    // 最新イベントの取得もこれで兼ねる
+  } else {
+    // 静的モード: 初回のみ取得
+    filter = { kinds: [1], limit: 50 };
+  }
+  
+  const req = ["REQ", currentSubId, filter];
+  if (relay && relay.readyState === WebSocket.OPEN) {
+    relay.send(JSON.stringify(req));
+  }
+}
+
 function handleEvent(event) {
   if (events.find(e => e.id === event.id)) return;
 
@@ -76,6 +110,7 @@ function handleEvent(event) {
   latestSeen = Math.max(latestSeen, event.created_at);
   oldestSeen = Math.min(oldestSeen, event.created_at);
 
+  // タイムラインの表示を更新
   renderEvent(event, autoUpdate ? 'prepend' : 'append');
 }
 
