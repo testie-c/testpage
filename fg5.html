@@ -96,6 +96,7 @@ const timeline = document.getElementById("timeline");
 const flowgazerOnlyCheckbox = document.getElementById('filter-flowgazer-only');
 const relayUrlInput = document.getElementById("relay-url");
 const subscribeButton = document.getElementById("subscribe-relay");
+const generateButton = document.getElementById("generate-keypair");
 
 const MAIN_SUB_ID = "motherfuncking-main-sub";
 const MORE_POSTS_SUB_ID = "motherfuncking-more-posts";
@@ -416,8 +417,12 @@ function subscribeRelay(relayUrl, authors) {
     alert("Failed to connect to relay:", relayUrl);
     return;
   }
-  events = {};
+  
+  // ▼ 修正箇所はここです
+  Object.keys(events).forEach(key => delete events[key]);
   pubkeysToFetch.clear();
+  // ▲ 修正箇所はここまでです
+  
   oldestCreatedAt = Number.MAX_VALUE;
   let afterEose = false;
   const filter = { kinds: [1, 6], limit: 50 };
