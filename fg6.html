@@ -483,6 +483,14 @@ function startRealtimeSubscription() {
   relayWS.send(JSON.stringify(["REQ", REALTIME_SUB_ID, filter]));
 }
 
+// タイムラインの再描画とプロフィール取得を行う関数
+function refreshTimelineAndFetchProfiles() {
+    refreshTimeline();
+    fetchProfiles();
+    loadMoreButton.classList.remove("loading");
+}
+
+
 // リアルタイム購読を停止する関数
 function stopRealtimeSubscription() {
   if (!relayWS || relayWS.readyState !== WebSocket.OPEN) return;
