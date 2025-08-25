@@ -6,6 +6,9 @@
 <title>flowgazer</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<style>
+  /* ここに既存のCSSスタイルがある場合は、そのまま維持してください */
+</style>
 </head>
 <body>
 <div id="header-placeholder"></div>
@@ -102,16 +105,15 @@ const newEventAutoLoadingCheckbox = document.getElementById("newevent-auto-loadi
 
 const MAIN_SUB_ID = "motherfuncking-main-sub";
 const MORE_POSTS_SUB_ID = "motherfuncking-more-posts";
+const REALTIME_SUB_ID = "motherfuncking-realtime-sub";
 const PROFILE_SUB_ID = "motherfuncking-profile-sub";
 const LS_RELAY_URL_KEY = "relayUrl";
 
 let isFlowgazerOnly = false;
-let isAutoLoading = false;
 let oldestCreatedAt = Number.MAX_VALUE;
 let filteredAuthors = null;
 let lastHighlightedEventId;
 let relayWS;
-let newEventsWS; // 最新投稿の自動更新用WebSocket
 const supportedKinds = [1, 6];
 const profiles = {};
 const events = {};
@@ -414,7 +416,7 @@ function subscribeRelay(relayUrl, authors) {
     relayWS.close();
   }
 
-  // 過去ログ読み込みのためのWebSocketを再接続
+  // 過去ログ読み込みとリアルタイム更新のためのWebSocketを一本化して接続
   try {
     relayWS = new WebSocket(relayUrl);
   } catch (err) {
@@ -432,58 +434,59 @@ function subscribeRelay(relayUrl, authors) {
   const filter = { kinds: [1, 6], limit: 50 };
   if (authors && authors.length > 0) filter.authors = authors;
 
-  // 過去ログ読み込み
-  relayWS.addEventListener("open", () => relayWS.send(JSON.stringify(["REQ", MAIN_SUB_ID, filter])));
+  relayWS.addEventListener("open", () => {
+    // 初期の過去ログを単発で取得
+    relayWS.send(JSON.stringify(["REQ", MAIN_SUB_ID, filter]));
+
+    // 自動更新がチェックされていれば、リアルタイム購読を開始
+    if (newEventAutoLoadingCheckbox.checked) {
+      startRealtimeSubscription();
+    }
+  });
+
   relayWS.addEventListener("message", ev => {
     try {
       const r2cMsg = JSON.parse(ev.data);
-      if (r2cMsg[0] === "EVENT" && r2cMsg[1] === MAIN_SUB_ID) {
-        onEvent(r2cMsg[2]);
-      } else if (r2cMsg[0] === "EOSE" && r2cMsg[1] === MAIN_SUB_ID) {
-        fetchProfiles();
-        checkForAutoLoad();
-        loadMoreButton.classList.remove("loading");
+      if (r2cMsg[0] === "EVENT") {
+        const subId = r2cMsg[1];
+        if (subId === MAIN_SUB_ID || subId === REALTIME_SUB_ID || subId === MORE_POSTS_SUB_ID) {
+          onEvent(r2cMsg[2]);
+        }
+      } else if (r2cMsg[0] === "EOSE") {
+        const subId = r2cMsg[1];
+        if (subId === MAIN_SUB_ID) {
+          // 過去ログ取得購読を終了
+          relayWS.send(JSON.stringify(["CLOSE", MAIN_SUB_ID]));
+          fetchProfiles();
+          loadMoreButton.classList.remove("loading");
+        } else if (subId === MORE_POSTS_SUB_ID) {
+          // 「もっと見る」購読を終了
+          relayWS.send(JSON.stringify(["CLOSE", MORE_POSTS_SUB_ID]));
+          fetchProfiles();
+          loadMoreButton.classList.remove("loading");
+        }
       }
     } catch (err) {
       console.error(err);
     }
   });
-  relayWS.addEventListener("close", onWSClose);
 
-  // 最新投稿の自動更新も再開
-  if (newEventAutoLoadingCheckbox.checked) {
-    openNewEventsSub();
-  }
+  relayWS.addEventListener("close", onWSClose);
 }
 
-// 最新投稿の自動更新購読を開始する関数
-function openNewEventsSub() {
-  if (newEventsWS) {
-    newEventsWS.close();
-  }
-  const relayUrl = relayUrlInput.value;
-  try {
-    newEventsWS = new WebSocket(relayUrl);
-  } catch (err) {
-    console.error("failed to connect for new events:", err);
-    return;
-  }
+// リアルタイム購読を開始する関数
+function startRealtimeSubscription() {
+  if (!relayWS || relayWS.readyState !== WebSocket.OPEN) return;
   const filter = { kinds: [1, 6] };
   if (filteredAuthors && filteredAuthors.length > 0) filter.authors = filteredAuthors;
+  // リアルタイムストリーミングのための新しいREQメッセージを送信
+  relayWS.send(JSON.stringify(["REQ", REALTIME_SUB_ID, filter]));
+}
 
-  newEventsWS.addEventListener("open", () => {
-    newEventsWS.send(JSON.stringify(["REQ", "new-events-sub", filter]));
-  });
-  newEventsWS.addEventListener("message", ev => {
-    try {
-      const r2cMsg = JSON.parse(ev.data);
-      if (r2cMsg[0] === "EVENT") {
-        onEvent(r2cMsg[2]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  });
+// リアルタイム購読を停止する関数
+function stopRealtimeSubscription() {
+  if (!relayWS || relayWS.readyState !== WebSocket.OPEN) return;
+  relayWS.send(JSON.stringify(["CLOSE", REALTIME_SUB_ID]));
 }
 
 function fetchProfiles() {
@@ -523,16 +526,6 @@ function filterAuthors() {
 
 function onWSClose() {
   alert("Relay connection closed");
-}
-
-function checkForAutoLoad() {
-  if (isAutoLoading && timeline.children.length < 10) {
-    console.log("Auto-loading next page...");
-    setTimeout(() => isAutoLoading && loadMoreButton.click(), 500);
-  } else {
-    isAutoLoading = false;
-    cancelLoadingButton.style.display = 'none';
-  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -590,11 +583,14 @@ getFromExtensionButton.addEventListener('click', async () => {
 });
 
 sendPostButton.addEventListener("click", sendeNewPost);
+
 subscribeButton.addEventListener("click", () => {
   const rurl = relayUrlInput.value;
-  subscribeRelay(rurl);
+  filteredAuthors = filterAuthors(); // フィルターを適用
+  subscribeRelay(rurl, filteredAuthors);
   localStorage.setItem(LS_RELAY_URL_KEY, rurl);
 });
+
 flowgazerOnlyCheckbox.addEventListener('change', () => {
   isFlowgazerOnly = flowgazerOnlyCheckbox.checked;
   refreshTimeline();
@@ -603,11 +599,9 @@ flowgazerOnlyCheckbox.addEventListener('change', () => {
 // 新しいイベントリスナー
 newEventAutoLoadingCheckbox.addEventListener('change', () => {
   if (newEventAutoLoadingCheckbox.checked) {
-    openNewEventsSub();
+    startRealtimeSubscription();
   } else {
-    if (newEventsWS) {
-      newEventsWS.close();
-    }
+    stopRealtimeSubscription();
   }
 });
 
@@ -677,20 +671,17 @@ clearFilterButton.addEventListener("click", () => {
 });
 
 loadMoreButton.addEventListener("click", function() {
-  if (!relayWS || relayWS.readyState !== WebSocket.OPEN || this.classList.contains("loading")) return;
+  if (!relayWS || relayWS.readyState !== WebSocket.OPEN) return;
   this.classList.add("loading");
-  isAutoLoading = true;
-  document.getElementById('cancel-loading').style.display = 'inline';
   const filter = { kinds: [1, 6], until: oldestCreatedAt - 1, limit: 50 };
   if (filteredAuthors && filteredAuthors.length > 0) filter.authors = filteredAuthors;
   relayWS.send(JSON.stringify(["REQ", MORE_POSTS_SUB_ID, filter]));
 });
 
 cancelLoadingButton.addEventListener('click', function() {
-  isAutoLoading = false;
+  if (relayWS.readyState === WebSocket.OPEN) relayWS.send(JSON.stringify(["CLOSE", MORE_POSTS_SUB_ID]));
   loadMoreButton.classList.remove('loading');
   this.style.display = 'none';
-  if (relayWS.readyState === WebSocket.OPEN) relayWS.send(JSON.stringify(["CLOSE", MORE_POSTS_SUB_ID]));
 });
 </script>
 <script src="https://ompomz.github.io/header/loadHeader.js"></script>
