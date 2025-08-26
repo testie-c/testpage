@@ -1,3 +1,5 @@
+// stop.js
+
 function stopAutoLoading() {
   isAutoLoading = false;
 
