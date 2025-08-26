@@ -897,13 +897,6 @@ subscribeButton.addEventListener("click", function() {
   var rurl = relayUrlInput.value;
   subscribeRelay(rurl);
   localStorage.setItem(LS_RELAY_URL_KEY, rurl);
-  
-  // 自動更新がOFFの場合、購読を停止
-  if (!autoUpdateToggle.checked) {
-    if (typeof stopAutoLoading === 'function') {
-      stopAutoLoading();
-    }
-  }
 });
 
 // `filter-flowgazer-only` チェックボックスの変更イベントリスナーを追加
@@ -932,7 +925,7 @@ autoUpdateToggle.addEventListener('change', function() {
 });
 
 var latestRurl = localStorage.getItem(LS_RELAY_URL_KEY);
-var defaultRurl = getLanguage() === "ja" ? "wss://relay-jp.nostr.wirednet.jp" : "wss://nos.lol/";
+var defaultRurl = getLanguage() === "ja" ? "wss://r.kojira.io" : "wss://nos.lol/";
 var initialRurl = latestRurl || defaultRurl;
 relayUrlInput.value = initialRurl;
 subscribeRelay(initialRurl);
@@ -1041,13 +1034,6 @@ applyFilterButton.addEventListener("click", function() {
   var rurl = relayUrlInput.value;
   localStorage.setItem('hexFilterValue', hexFilterInput.value);
   subscribeRelay(rurl, filteredAuthors);
-  
-  // 自動更新がOFFの場合、購読を停止
-  if (!autoUpdateToggle.checked) {
-    if (typeof stopAutoLoading === 'function') {
-      stopAutoLoading();
-    }
-  }
 });
 
 clearFilterButton.addEventListener("click", function() {
@@ -1056,13 +1042,6 @@ clearFilterButton.addEventListener("click", function() {
   localStorage.removeItem('hexFilterValue');
   var rurl = relayUrlInput.value;
   subscribeRelay(rurl);
-  
-  // 自動更新がOFFの場合、購読を停止
-  if (!autoUpdateToggle.checked) {
-    if (typeof stopAutoLoading === 'function') {
-      stopAutoLoading();
-    }
-  }
 });
 
 // もっと見るボタン
@@ -1097,7 +1076,7 @@ loadMoreButton.addEventListener("click", function() {
 
 // 「あきらめる」ボタン
 const cancelLoadingButton = document.getElementById('cancel-loading');
-cancelLoadingButton.addEventListener("click", function() {
+cancelLoadingButton.addEventListener('click', function() {
   isAutoLoading = false;
   loadMoreButton.classList.remove('loading');
   this.style.display = 'none';
@@ -1108,13 +1087,6 @@ cancelLoadingButton.addEventListener("click", function() {
 
 // 自動で次のページを読み込むかチェックする関数
 function checkForAutoLoad() {
-  // 自動更新がONの場合のみ自動読み込みを続ける
-  if (!autoUpdateToggle.checked) {
-    isAutoLoading = false;
-    document.getElementById('cancel-loading').style.display = 'none';
-    return;
-  }
-  
   const displayedEventsCount = timeline.children.length;
   if (isAutoLoading && displayedEventsCount < 10) { // 表示数が少ない場合
     console.log("Auto-loading next page...");
