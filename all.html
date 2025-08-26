@@ -894,6 +894,12 @@ var LS_RELAY_URL_KEY = "relayUrl";
 var relayUrlInput = document.getElementById("relay-url");
 var subscribeButton = document.getElementById("subscribe-relay");
 subscribeButton.addEventListener("click", function() {
+  // 自動更新がOFFの場合、チェックボックスをONにする
+  if (!autoUpdateToggle.checked) {
+    autoUpdateToggle.checked = true;
+    console.log("subscribe-relayボタンが押されたため、自動更新をONにしました。");
+  }
+
   var rurl = relayUrlInput.value;
   subscribeRelay(rurl);
   localStorage.setItem(LS_RELAY_URL_KEY, rurl);
@@ -1030,6 +1036,12 @@ function filterAuthors() {
 }
 
 applyFilterButton.addEventListener("click", function() {
+  // 自動更新がOFFの場合、チェックボックスをONにする
+  if (!autoUpdateToggle.checked) {
+    autoUpdateToggle.checked = true;
+    console.log("apply-filterボタンが押されたため、自動更新をONにしました。");
+  }
+
   filteredAuthors = filterAuthors();
   var rurl = relayUrlInput.value;
   localStorage.setItem('hexFilterValue', hexFilterInput.value);
