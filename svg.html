@@ -11,6 +11,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .container { max-width: 600px; margin-left: 0.5rem; margin-right: auto; padding: 0.5rem 0.5rem 0rem 0.5rem; }
 @media (max-width: 767px) { .container { max-width: 100%; padding: 8px 8px 0px 8px; margin: 0; } }
 @media (max-width: 400px) { .flex-container button {font-size: 0.6rem !important;} }
+.auto-stop-message { width: 100%; max-width: 600px; margin: 0 auto; padding-bottom: 0.5rem; color: #666; text-align: center; }
+@media (max-width: 767px) { .auto-stop-message { max-width: 100%; } }
 h1 { font-size: 1.2rem; margin: 0rem 0rem 0.5rem 0rem; }
 p { margin: 0; }
 a { color: #666; text-decoration: none; }
@@ -505,10 +507,10 @@ function postEventView(nostrEv) {
     }
     pressTimer = setTimeout(() => {
       clearTimeout(pressTimer);
-      if (confirm("いいねしますか？")) {
+      if (confirm("☆ふぁぼる？")) {
         sendLikeEvent(nostrEv.id, nostrEv.pubkey);
       }
-    }, 1500);
+    }, 800);
   });
   view.addEventListener('mouseup', () => {
     clearTimeout(pressTimer);
@@ -521,10 +523,10 @@ function postEventView(nostrEv) {
   view.addEventListener('touchstart', (e) => {
     pressTimer = setTimeout(() => {
       clearTimeout(pressTimer);
-      if (confirm("いいねしますか？")) {
+      if (confirm("☆ふぁぼる？")) {
         sendLikeEvent(nostrEv.id, nostrEv.pubkey);
       }
-    }, 1500);
+    }, 800);
   });
   view.addEventListener('touchend', () => {
     clearTimeout(pressTimer);
@@ -598,10 +600,10 @@ async function sendLikeEvent(targetEventId, targetPubkey) {
         alert("いいねを送信しました！");
       } catch (err) {
         console.error("NIP-07署名に失敗:", err);
-        alert("いいねの送信に失敗しました。拡張機能の権限を確認してください。");
+        alert("なんかふぁぼれなかったごめん。");
       }
     } else {
-      alert("いいねを送信するには、秘密鍵を入力するか、ブラウザ拡張機能でログインしてください。");
+      alert("ふぁぼりたかったら、秘密鍵を入力（生成）するか、ブラウザ拡張機能でログインしてね。");
     }
   } else { // 秘密鍵入力でログイン
     try {
@@ -622,10 +624,10 @@ async function sendLikeEvent(targetEventId, targetPubkey) {
       };
       const signedEvent = window.NostrTools.finalizeEvent(likeEvent, seckey);
       relayWS.send(JSON.stringify(["EVENT", signedEvent]));
-      alert('いいねを送信しました！');
+      alert('ふぁぼった！');
     } catch (err) {
       console.error("秘密鍵署名に失敗:", err);
-      alert("いいねの送信に失敗しました；；");
+      alert("ふぁぼれなかった；；");
     }
   }
 }
