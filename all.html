@@ -1,493 +1,526 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
- <meta charset="UTF-8">
- <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>stargazer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>stargazer</title>
  <style>
-* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"; padding: 16px; line-height: 1.3; font-weight: normal; background-color: #f7f7f7; color: #333; } h4 { font-size: 1.25rem; color: #555; margin-bottom: .5rem; } p { font-size: .9rem; color: #666; margin-bottom: .25rem; } a { color: #007bff; text-decoration: none; } a:hover { text-decoration: underline; } .container { max-width: 600px; margin-left: .5rem; margin-right: auto; padding: .5rem; } @media (max-width: 767px) { .container { max-width: 100%; padding: 8px; margin: 0; } } label { font-size: .9rem; color: #666; } input[type="text"], textarea { border: 1px solid #ccc; padding: 6px; border-radius: 4px; margin: 4px; } button { border: none; padding: 6px 12px; border-radius: 20px; color: white; cursor: pointer; font-weight: bold; transition: background-color .2s; background-color: #aaa; /* デフォルトのボタン色 */ } #apply-pubkey-for-reactions { background-color: #ff99cc; } #apply-pubkey-for-reactions:hover { background-color: #ff66b2; } button#load-more { background-color: #66b3ff; } button#load-more:hover { background-color: #4da6ff; } button#load-more.loading { visibility: hidden; } hr { border: none; border-top: 0px solid #ccc; margin: 0px 0px 0px 0px; } ul#timeline { list-style: none; padding: 0; margin: 8px 0; border-top: 1px solid #eee; } #timeline li { list-style: none !important; } li.event { word-break: break-all; padding: 6px 0; border-bottom: 1px solid #eee; } li.event-reaction { background-color: #f7f7f7; } .original-post-preview { margin: 0.5rem 0.5rem 0rem 0.5rem; background-color: #f7f7f7; border-left: 0rem solid #f7f7f7; font-size: 0.9em; font-style: normal; max-height: 100px; overflow: hidden; text-overflow: ellipsis; padding: 1px; border-radius: 4px; } .original-post-preview.loading { color: #888; } .nostr-ref { background-color: #f7f7f7; padding: 1px 2px; border-radius: 4px; } a.pubkey-ref { font-weight: bold; color: #555; text-decoration: none; } a.pubkey-ref:hover { text-decoration: underline; } time { color: #888; }
+ * { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"; padding: 16px; line-height: 1.3; font-weight: normal; background-color: #f7f7f7; color: #333; } h1 { font-size: 1.25rem; color: #555; margin-bottom: .5rem; } p { font-size: .9rem; color: #666; margin-bottom: .25rem; } a { color: #007bff; text-decoration: none; } a:hover { text-decoration: underline; } .container { max-width: 600px; margin-left: .5rem; margin-right: auto; padding: .5rem; } @media (max-width: 767px) { .container { max-width: 100%; padding: 8px; margin: 0; } } label { font-size: .9rem; color: #666; } input[type="text"], textarea { border: 1px solid #ccc; padding: 6px; border-radius: 4px; margin: 4px; } button { border: none; padding: 6px 12px; border-radius: 20px; color: white; cursor: pointer; font-weight: bold; transition: background-color .2s; background-color: #aaa; /* デフォルトのボタン色 */ } #apply-pubkey-for-reactions { background-color: #ff99cc; } #apply-pubkey-for-reactions:hover { background-color: #ff66b2; } #connect-relay { background-color: #4CAF50; } #connect-relay:hover { background-color: #45a049; } button#load-more { background-color: #66b3ff; } button#load-more:hover { background-color: #4da6ff; } button#load-more.loading { visibility: hidden; } hr { border: none; border-top: 0px solid #ccc; margin: 0px 0px 0px 0px; } ul#timeline { list-style: none; padding: 0; margin: 8px 0; border-top: 1px solid #eee; } #timeline li { list-style: none !important; } li.event { word-break: break-all; padding: 6px 0; border-bottom: 1px solid #eee; } li.event-reaction { background-color: #f7f7f7; } .original-post-preview { margin: 0.5rem 0.5rem 0rem 0.5rem; background-color: #f7f7f7; border-left: 0rem solid #f7f7f7; font-size: 0.9em; font-style: normal; max-height: 100px; overflow: hidden; text-overflow: ellipsis; padding: 1px; border-radius: 4px; } .original-post-preview.loading { color: #888; } .nostr-ref { background-color: #f7f7f7; padding: 1px 2px; border-radius: 4px; } a.pubkey-ref { font-weight: bold; color: #555; text-decoration: none; } a.pubkey-ref:hover { text-decoration: underline; } time { color: #888; }
 </style>
 </head>
 <body>
 <div id="header-placeholder"></div>
- <h4>stargazer</h4><p style="font-size:1rem;">このページでは、特定の公開鍵が受け取ったリアクション（☆）を見ることができるよ。</p><div><label for="target-hex-pubkey">公開鍵（npub）</label><input id="target-hex-pubkey" type="text" placeholder="npub or hex or NIP-05"><button id="apply-pubkey-for-reactions">見る</button></div>
- <hr/>
- <ul id="timeline"></ul>
- <button type="button" id="load-more" class="loading">もっと見る</button>
- <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
- <script>
-  // === 汎用ヘルパー関数 ===
-  function getLanguage() {
-    return (window.navigator.language || window.navigator.browserLanguage || window.navigator.userLanguage).substring(0, 2);
-  }
- 
-  function formatTimestamp(date) {
-    return String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0") + ":" + String(date.getSeconds()).padStart(2, "0");
-  }
- 
-  function findTagWithValue(tags, name, value, extraPred) {
-    for (const tag of tags) {
-      if (tag[0] === name && tag[1] === value && (extraPred ? extraPred(tag) : true)) {
-        return tag;
-      }
-    }
-    return undefined;
-  }
- 
-  function baseEventView() {
-    const li = document.createElement("li");
-    li.classList.add("event");
-    return li;
-  }
- 
-  function externalLink(url, text) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noreferrer";
-    a.textContent = text;
-    return a;
-  }
- 
-  function timestampView(unixtime) {
-    const ts = new Date(unixtime * 1000);
-    const timeElem = document.createElement("time");
-    timeElem.setAttribute("datetime", ts.toISOString());
-    timeElem.textContent = "[" + formatTimestamp(ts) + "]";
-    return timeElem;
-  }
- 
-  // === プロフィールキャッシュと表示の更新ロジック ===
-  const profileCache = {};
-  const pubkeyElements = {};
- 
-  function getDisplayName(pubkey) {
-    if (profileCache[pubkey] && profileCache[pubkey].name) {
-      return profileCache[pubkey].name;
-    }
-    return pubkey.substring(0, 8);
-  }
- 
-  function updatePubkeyView(pubkey) {
-    const displayName = getDisplayName(pubkey);
-    if (pubkeyElements[pubkey]) {
-      pubkeyElements[pubkey].forEach(elem => {
-        elem.textContent = displayName;
-      });
-    }
-  }
- 
-  function pubkeyView(pubkey) {
-    const npub = window.NostrTools.nip19.npubEncode(pubkey);
-    const displayName = getDisplayName(pubkey);
-    const a = externalLink("https://njump.me/" + npub, displayName);
-    a.classList.add("pubkey-ref");
- 
-    if (!pubkeyElements[pubkey]) {
-      pubkeyElements[pubkey] = [];
-    }
-    pubkeyElements[pubkey].push(a);
- 
-    return a;
-  }
- 
-  function metadataView(nostrEv) {
-    const view = document.createElement("span");
-    view.appendChild(timestampView(nostrEv.created_at));
-    view.appendChild(document.createTextNode(" "));
-    view.appendChild(pubkeyView(nostrEv.pubkey));
-    view.appendChild(document.createTextNode(" > "));
-    return view;
-  }
- 
-  // === イベントキャッシュと元の投稿表示ロジック ===
-  const eventCache = {};
-  const eventsToFetch = new Set();
-  let eventFetchTimeout = null;
- 
-  // 元の投稿内容を取得し、表示を更新する関数
-  function fetchAndDisplayOriginalPost(reactedEventId) {
-    if (eventCache[reactedEventId]) {
-      updateOriginalPostView(reactedEventId);
-      return;
-    }
- 
-    if (!eventsToFetch.has(reactedEventId)) {
-      eventsToFetch.add(reactedEventId);
-      scheduleEventFetch();
-    }
-  }
- 
-  // 取得した元の投稿をDOMに反映する関数
-  function updateOriginalPostView(reactedEventId) {
-    const elementsToUpdate = document.querySelectorAll(`.original-post-preview[data-event-id="${reactedEventId}"]`);
-    elementsToUpdate.forEach(elem => {
-      const originalEvent = eventCache[reactedEventId];
-      if (originalEvent) {
-        elem.textContent = originalEvent.content.substring(0, 150) + (originalEvent.content.length > 150 ? '...' : '');
-        elem.classList.remove('loading');
-        elem.classList.remove('nostr-ref');
-      }
-    });
-  }
- 
-  // イベントをまとめてリクエストするスケジューラ
-  function scheduleEventFetch() {
-    if (eventFetchTimeout) {
-      clearTimeout(eventFetchTimeout);
-    }
-    eventFetchTimeout = setTimeout(() => {
-      if (eventsToFetch.size > 0 && reactionWSs.length > 0) {
-        const eventIds = Array.from(eventsToFetch);
-        const subId = "FETCH_ORIGINAL_EVENTS_" + Date.now();
-        for (const ws of reactionWSs) {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(["REQ", subId, {
-              kinds: [1, 6],
-              ids: eventIds,
-              limit: eventIds.length
-            }]));
-          }
-        }
-      }
-      eventFetchTimeout = null;
-    }, 100);
-  }
- 
-  // Kind:7 イベントの表示処理
-  function reactionEventView(nostrEv) {
-    const view = baseEventView();
-    view.id = nostrEv.id;
-    view.classList.add("event-reaction");
- 
-    view.appendChild(metadataView(nostrEv));
- 
-    let reactionContent = nostrEv.content;
-    if (reactionContent === "+") {
-      reactionContent = "☆";
-    } else if (reactionContent === "") {
-      reactionContent = "👍";
-    } else if (reactionContent === undefined) {
-      reactionContent = "👍";
-    }
- 
-    const contentSpan = document.createElement("span");
-    contentSpan.textContent = " " + reactionContent + " ";
-    view.appendChild(contentSpan);
- 
-    let reactedEventId;
-    for (const tag of nostrEv.tags) {
-      if (tag[0] === "e" && typeof tag[1] === "string") {
-        reactedEventId = tag[1];
-        break;
-      }
-    }
- 
-    if (reactedEventId) {
-      const nevent = window.NostrTools.nip19.neventEncode({
-        id: reactedEventId,
-        relays: ["wss://relay.nostr.band"]
-      });
-      const link = externalLink(`https://njump.me/${nevent}`, `元の投稿を見る`);
-      view.appendChild(document.createTextNode(" "));
-      view.appendChild(link);
-    }
- 
-    const originalPostContainer = document.createElement('div');
-    originalPostContainer.classList.add('original-post-preview');
-    originalPostContainer.id = `original-post-${nostrEv.id}`;
-    originalPostContainer.setAttribute('data-event-id', reactedEventId);
-    view.appendChild(document.createElement('br'));
-    view.appendChild(originalPostContainer);
- 
-    if (reactedEventId) {
-      originalPostContainer.textContent = `元の投稿を取得中... (nostr:${reactedEventId.substring(0, 8)}...)`;
-      originalPostContainer.classList.add('loading');
-      originalPostContainer.classList.add('nostr-ref');
-      fetchAndDisplayOriginalPost(reactedEventId);
-    } else {
-      originalPostContainer.textContent = "元の投稿が見つかりません。";
-      originalPostContainer.classList.add('nostr-ref');
-    }
-    return view;
-  }
- 
-  // ==== メインのロジック部分 ====
-  const timeline = document.getElementById("timeline");
-  if (timeline === null) {
-    throw new Error("no #timeline");
-  }
- 
-  const targetHexPubkeyInput = document.getElementById("target-hex-pubkey");
-  const applyPubkeyForReactionsButton = document.getElementById("apply-pubkey-for-reactions");
- 
-  // リレーURLを固定
-  const RELAY_URLS = ["wss://relay.nostr.band", "wss://relay.damus.io"];
- 
-  const reactionWSs = [];
-  const seenEventIds = new Set();
- 
-  let oldestCreatedAt = Number.MAX_VALUE;
-  let currentTargetPubkeyForReactions = undefined;
- 
-  const REACTION_SUB_ID = "motherfucking-reaction-sub";
-  const PROFILE_SUB_ID_REACTIONS = "motherfucking-profile-sub-reactions";
-  const MORE_REACTIONS_SUB_ID = "motherfucking-more-reactions-sub";
- 
-  const pubkeysToFetchProfile = new Set();
-  let profileFetchTimeout = null;
- 
-  // === タイムライン表示のリセット処理 ===
-  function clearTimeline() {
-    while (timeline.firstChild) {
-      timeline.removeChild(timeline.firstChild);
-    }
-    oldestCreatedAt = Number.MAX_VALUE;
-    seenEventIds.clear();
-  }
- 
-  // === 受信イベントのメイン処理 ===
-  function onEvent(nostrEv) {
-    // kind:0 プロフィールイベントの処理
-    if (nostrEv.kind === 0) {
-      try {
-        const metadata = JSON.parse(nostrEv.content);
-        profileCache[nostrEv.pubkey] = {
-          name: metadata.name || nostrEv.pubkey.substring(0, 8),
-          picture: metadata.picture,
-          about: metadata.about
-        };
-        updatePubkeyView(nostrEv.pubkey);
-        pubkeysToFetchProfile.delete(nostrEv.pubkey);
-      } catch (e) {
-        console.error("Failed to parse kind 0 content:", e);
-      }
-      return;
-    }
- 
-    // kind:1, 6 元の投稿イベントの処理
-    if (nostrEv.kind === 1 || nostrEv.kind === 6) {
-      eventCache[nostrEv.id] = nostrEv;
-      eventsToFetch.delete(nostrEv.id);
-      updateOriginalPostView(nostrEv.id);
-      return;
-    }
- 
-    // kind:7 リアクションイベントの処理
-    if (nostrEv.kind === 7) {
-      if (seenEventIds.has(nostrEv.id)) {
-        return;
-      }
-      seenEventIds.add(nostrEv.id);
-      const newReactionView = reactionEventView(nostrEv);
-      timeline.appendChild(newReactionView);
-      oldestCreatedAt = Math.min(oldestCreatedAt, nostrEv.created_at);
- 
-      if (!profileCache[nostrEv.pubkey] && !pubkeysToFetchProfile.has(nostrEv.pubkey)) {
-        pubkeysToFetchProfile.add(nostrEv.pubkey);
-        scheduleProfileFetch();
-      }
-    }
-  }
- 
-  // === プロフィール情報の遅延取得処理 ===
-  function scheduleProfileFetch() {
-    if (profileFetchTimeout) {
-      clearTimeout(profileFetchTimeout);
-    }
-    profileFetchTimeout = setTimeout(() => {
-      for (const ws of reactionWSs) {
-        if (pubkeysToFetchProfile.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
-          const pubkeys = Array.from(pubkeysToFetchProfile);
-          const subId = "PROFILE_SUB_ID_REACTIONS_" + Date.now();
-          ws.send(JSON.stringify(["REQ", subId, {
-            kinds: [0],
-            authors: pubkeys,
-            limit: pubkeys.length
-          }]));
-        }
-      }
-      profileFetchTimeout = null;
-    }, 100);
-  }
- 
-  // === リレー接続とイベント購読処理 ===
-  function subscribeToReactionRelay() {
-    reactionWSs.forEach(ws => {
-      ws.removeEventListener("close", onReactionWSClose);
-      ws.close();
-    });
-    reactionWSs.length = 0;
-    clearTimeline();
- 
-    for (const relayUrl of RELAY_URLS) {
-      let reactionWS;
-      try {
-        reactionWS = new WebSocket(relayUrl);
-        reactionWSs.push(reactionWS);
-      } catch (err) {
-        console.error("Failed to connect to relay:", err);
-        alert("Failed to connect to relay: " + relayUrl);
-        continue;
-      }
- 
-      reactionWS.addEventListener("open", function() {
-        console.log("Connected to relay:", relayUrl);
-        if (currentTargetPubkeyForReactions) {
-          reactionWS.send(
-            JSON.stringify(["REQ", REACTION_SUB_ID, {
-              kinds: [7],
-              "#p": [currentTargetPubkeyForReactions],
-              limit: 50
-            }])
-          );
-        } else {
-          loadMoreButton.classList.remove("loading");
-        }
-      });
- 
-      reactionWS.addEventListener("message", function(ev) {
-        try {
-          const r2cMsg = JSON.parse(ev.data);
-          switch (r2cMsg[0]) {
-            case "EVENT":
-              const nostrEv = r2cMsg[2];
-              if (!window.NostrTools.verifyEvent(nostrEv)) {
-                console.error("nostr event with invalid signature:", nostrEv);
-                return;
-              }
-              onEvent(nostrEv);
-              break;
- 
-            case "EOSE":
-              if (r2cMsg[1] === REACTION_SUB_ID || r2cMsg[1] === MORE_REACTIONS_SUB_ID) {
-                loadMoreButton.classList.remove("loading");
-              }
-              break;
- 
-            case "OK":
-              break;
-            case "NOTICE":
-              console.warn("Relay Notice:", r2cMsg[1]);
-              break;
-            default:
-              console.log(r2cMsg);
-              break;
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
- 
-      reactionWS.addEventListener("close", onReactionWSClose);
-    }
-  }
- 
-  // === リレー切断時の再接続処理 ===
-  function onReactionWSClose() {
-    console.log("Relay connection closed. Attempting to reconnect...");
-    setTimeout(subscribeToReactionRelay, 5000);
-  }
- 
-  // === NIP-05検証関数 ===
-  async function fetchPubkeyFromNip05(nip05) {
-    const [user, domain] = nip05.split('@');
-    if (!user || !domain) {
-      throw new Error("Invalid NIP-05 address format.");
-    }
- 
-    const url = `https://${domain}/.well-known/nostr.json?name=${user}`;
- 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch NIP-05 data: ${response.statusText}`);
-      }
- 
-      const data = await response.json();
-      const pubkey = data.names[user];
-      if (!pubkey) {
-        throw new Error(`User "${user}" not found in NIP-05 data.`);
-      }
-      return pubkey;
-    } catch (e) {
-      console.error("NIP-05 verification failed:", e);
-      throw e;
-    }
-  }
- 
-  // ==== イベントリスナー ====
-  applyPubkeyForReactionsButton.addEventListener("click", async function() {
-    const inputVal = targetHexPubkeyInput.value.trim();
-    let hexPubkey;
- 
-    if (inputVal.startsWith("npub1")) {
-      try {
-        const { type, data } = window.NostrTools.nip19.decode(inputVal);
-        if (type === "npub") {
-          hexPubkey = data;
-        } else {
-          throw new Error("Invalid npub key.");
-        }
-      } catch (e) {
-        console.error("Failed to decode npub:", e);
-        alert("有効なnpub公開鍵ではありません。");
-        currentTargetPubkeyForReactions = undefined;
-        clearTimeline();
-        return;
-      }
-    } else if (inputVal.includes("@")) {
-      try {
-        hexPubkey = await fetchPubkeyFromNip05(inputVal);
-      } catch (e) {
-        alert("有効なNIP-05アドレスではありません。");
-        currentTargetPubkeyForReactions = undefined;
-        clearTimeline();
-        return;
-      }
-    } else if (inputVal.length === 64 && /^[0-9a-fA-F]+$/.test(inputVal)) {
-      hexPubkey = inputVal;
-    } else {
-      alert("有効なhex、npub、またはNIP-05公開鍵を入力してください。");
-      currentTargetPubkeyForReactions = undefined;
-      clearTimeline();
-      return;
-    }
- 
-    currentTargetPubkeyForReactions = hexPubkey;
-    console.log("Subscribing reactions for pubkey:", currentTargetPubkeyForReactions);
-    subscribeToReactionRelay();
-  });
- 
-  const loadMoreButton = document.getElementById("load-more");
- 
-  // === 「もっと見る」ボタンのイベントハンドラ ===
-  function fetchMoreReactions() {
-    if (!reactionWSs.some(ws => ws && ws.readyState === WebSocket.OPEN) || !currentTargetPubkeyForReactions) {
-      console.warn("Relay not connected or no target pubkey set.");
-      return;
-    }
-    loadMoreButton.classList.add("loading");
- 
-    const filter = {
-      kinds: [7],
-      limit: 50,
-      until: oldestCreatedAt - 1,
-      "#p": [currentTargetPubkeyForReactions]
-    };
-    for (const ws of reactionWSs) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(["REQ", MORE_REACTIONS_SUB_ID, filter]));
-      }
-    }
-  }
-  loadMoreButton.addEventListener("click", fetchMoreReactions);
- 
-  // === 初期化処理 ===
-  document.addEventListener("DOMContentLoaded", function() {
-    // ページロード時に自動でリレーに接続
-    subscribeToReactionRelay();
-  });
+<h1>stargazer</h1>
+<p style="font-size:1rem;">このページでは、特定の公開鍵が受け取ったリアクション（☆）を見ることができるよ。</p>
+<div>
+    <label for="target-hex-pubkey">公開鍵（npub）</label>
+    <input id="target-hex-pubkey" type="text" placeholder="npub or hex or NIP-05">
+    <button id="apply-pubkey-for-reactions">見る</button>
+</div>
+<br>
+<div>
+    <label for="relay-url">リレーURL</label>
+    <input id="relay-url" type="text" placeholder="wss://... (カンマ区切りで複数指定)">
+    <button id="connect-relay">接続</button>
+</div>
+<hr/>
+<ul id="timeline"></ul>
+<button type="button" id="load-more" class="loading">もっと見る</button>
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script>
+    // === 汎用ヘルパー関数 ===
+    function getLanguage() {
+      return (window.navigator.language || window.navigator.browserLanguage || window.navigator.userLanguage).substring(0, 2);
+    }
+    
+    function formatTimestamp(date) {
+      return String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0") + ":" + String(date.getSeconds()).padStart(2, "0");
+    }
+    
+    function findTagWithValue(tags, name, value, extraPred) {
+      for (const tag of tags) {
+        if (tag[0] === name && tag[1] === value && (extraPred ? extraPred(tag) : true)) {
+          return tag;
+        }
+      }
+      return undefined;
+    }
+    
+    function baseEventView() {
+      const li = document.createElement("li");
+      li.classList.add("event");
+      return li;
+    }
+    
+    function externalLink(url, text) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      a.textContent = text;
+      return a;
+    }
+    
+    function timestampView(unixtime) {
+      const ts = new Date(unixtime * 1000);
+      const timeElem = document.createElement("time");
+      timeElem.setAttribute("datetime", ts.toISOString());
+      timeElem.textContent = "[" + formatTimestamp(ts) + "]";
+      return timeElem;
+    }
+    
+    // === プロフィールキャッシュと表示の更新ロジック ===
+    const profileCache = {};
+    const pubkeyElements = {};
+    
+    function getDisplayName(pubkey) {
+      if (profileCache[pubkey] && profileCache[pubkey].name) {
+        return profileCache[pubkey].name;
+      }
+      return pubkey.substring(0, 8);
+    }
+    
+    function updatePubkeyView(pubkey) {
+      const displayName = getDisplayName(pubkey);
+      if (pubkeyElements[pubkey]) {
+        pubkeyElements[pubkey].forEach(elem => {
+          elem.textContent = displayName;
+        });
+      }
+    }
+    
+    function pubkeyView(pubkey) {
+      const npub = window.NostrTools.nip19.npubEncode(pubkey);
+      const displayName = getDisplayName(pubkey);
+      const a = externalLink("https://njump.me/" + npub, displayName);
+      a.classList.add("pubkey-ref");
+    
+      if (!pubkeyElements[pubkey]) {
+        pubkeyElements[pubkey] = [];
+      }
+      pubkeyElements[pubkey].push(a);
+    
+      return a;
+    }
+    
+    function metadataView(nostrEv) {
+      const view = document.createElement("span");
+      view.appendChild(timestampView(nostrEv.created_at));
+      view.appendChild(document.createTextNode(" "));
+      view.appendChild(pubkeyView(nostrEv.pubkey));
+      view.appendChild(document.createTextNode(" > "));
+      return view;
+    }
+    
+    // === イベントキャッシュと元の投稿表示ロジック ===
+    const eventCache = {};
+    const eventsToFetch = new Set();
+    let eventFetchTimeout = null;
+    
+    // 元の投稿内容を取得し、表示を更新する関数
+    function fetchAndDisplayOriginalPost(reactedEventId) {
+      if (eventCache[reactedEventId]) {
+        updateOriginalPostView(reactedEventId);
+        return;
+      }
+    
+      if (!eventsToFetch.has(reactedEventId)) {
+        eventsToFetch.add(reactedEventId);
+        scheduleEventFetch();
+      }
+    }
+    
+    // 取得した元の投稿をDOMに反映する関数
+    function updateOriginalPostView(reactedEventId) {
+      const elementsToUpdate = document.querySelectorAll(`.original-post-preview[data-event-id="${reactedEventId}"]`);
+      elementsToUpdate.forEach(elem => {
+        const originalEvent = eventCache[reactedEventId];
+        if (originalEvent) {
+          elem.textContent = originalEvent.content.substring(0, 150) + (originalEvent.content.length > 150 ? '...' : '');
+          elem.classList.remove('loading');
+          elem.classList.remove('nostr-ref');
+        }
+      });
+    }
+    
+    // イベントをまとめてリクエストするスケジューラ
+    function scheduleEventFetch() {
+      if (eventFetchTimeout) {
+        clearTimeout(eventFetchTimeout);
+      }
+      eventFetchTimeout = setTimeout(() => {
+        if (eventsToFetch.size > 0 && reactionWSs.length > 0) {
+          const eventIds = Array.from(eventsToFetch);
+          const subId = "FETCH_ORIGINAL_EVENTS_" + Date.now();
+          for (const ws of reactionWSs) {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify(["REQ", subId, {
+                kinds: [1, 6],
+                ids: eventIds,
+                limit: eventIds.length
+              }]));
+            }
+          }
+        }
+        eventFetchTimeout = null;
+      }, 100);
+    }
+    
+    // Kind:7 イベントの表示処理
+    function reactionEventView(nostrEv) {
+      const view = baseEventView();
+      view.id = nostrEv.id;
+      view.classList.add("event-reaction");
+    
+      view.appendChild(metadataView(nostrEv));
+    
+      let reactionContent = nostrEv.content;
+      if (reactionContent === "+") {
+        reactionContent = "☆";
+      } else if (reactionContent === "") {
+        reactionContent = "👍";
+      } else if (reactionContent === undefined) {
+        reactionContent = "👍";
+      }
+    
+      const contentSpan = document.createElement("span");
+      contentSpan.textContent = " " + reactionContent + " ";
+      view.appendChild(contentSpan);
+    
+      let reactedEventId;
+      for (const tag of nostrEv.tags) {
+        if (tag[0] === "e" && typeof tag[1] === "string") {
+          reactedEventId = tag[1];
+          break;
+        }
+      }
+    
+      if (reactedEventId) {
+        const nevent = window.NostrTools.nip19.neventEncode({
+          id: reactedEventId,
+          relays: ["wss://relay.nostr.band"]
+        });
+        const link = externalLink(`https://njump.me/${nevent}`, `元の投稿を見る`);
+        view.appendChild(document.createTextNode(" "));
+        view.appendChild(link);
+      }
+    
+      const originalPostContainer = document.createElement('div');
+      originalPostContainer.classList.add('original-post-preview');
+      originalPostContainer.id = `original-post-${nostrEv.id}`;
+      originalPostContainer.setAttribute('data-event-id', reactedEventId);
+      view.appendChild(document.createElement('br'));
+      view.appendChild(originalPostContainer);
+    
+      if (reactedEventId) {
+        originalPostContainer.textContent = `元の投稿を取得中... (nostr:${reactedEventId.substring(0, 8)}...)`;
+        originalPostContainer.classList.add('loading');
+        originalPostContainer.classList.add('nostr-ref');
+        fetchAndDisplayOriginalPost(reactedEventId);
+      } else {
+        originalPostContainer.textContent = "元の投稿が見つかりません。";
+        originalPostContainer.classList.add('nostr-ref');
+      }
+      return view;
+    }
+    
+    // ==== メインのロジック部分 ====
+    const timeline = document.getElementById("timeline");
+    if (timeline === null) {
+      throw new Error("no #timeline");
+    }
+    
+    const targetHexPubkeyInput = document.getElementById("target-hex-pubkey");
+    const applyPubkeyForReactionsButton = document.getElementById("apply-pubkey-for-reactions");
+    
+    // 新しいHTML要素を取得
+    const relayUrlInput = document.getElementById("relay-url");
+    const connectRelayButton = document.getElementById("connect-relay");
+    
+    // リレーURLを固定する部分を削除
+    // const RELAY_URLS = ["wss://relay.nostr.band", "wss://relay.damus.io"];
+    
+    const reactionWSs = [];
+    const seenEventIds = new Set();
+    
+    let oldestCreatedAt = Number.MAX_VALUE;
+    let currentTargetPubkeyForReactions = undefined;
+    
+    const REACTION_SUB_ID = "motherfucking-reaction-sub";
+    const PROFILE_SUB_ID_REACTIONS = "motherfucking-profile-sub-reactions";
+    const MORE_REACTIONS_SUB_ID = "motherfucking-more-reactions-sub";
+    
+    const pubkeysToFetchProfile = new Set();
+    let profileFetchTimeout = null;
+    
+    // === タイムライン表示のリセット処理 ===
+    function clearTimeline() {
+      while (timeline.firstChild) {
+        timeline.removeChild(timeline.firstChild);
+      }
+      oldestCreatedAt = Number.MAX_VALUE;
+      seenEventIds.clear();
+    }
+    
+    // === 受信イベントのメイン処理 ===
+    function onEvent(nostrEv) {
+      // kind:0 プロフィールイベントの処理
+      if (nostrEv.kind === 0) {
+        try {
+          const metadata = JSON.parse(nostrEv.content);
+          profileCache[nostrEv.pubkey] = {
+            name: metadata.name || nostrEv.pubkey.substring(0, 8),
+            picture: metadata.picture,
+            about: metadata.about
+          };
+          updatePubkeyView(nostrEv.pubkey);
+          pubkeysToFetchProfile.delete(nostrEv.pubkey);
+        } catch (e) {
+          console.error("Failed to parse kind 0 content:", e);
+        }
+        return;
+      }
+    
+      // kind:1, 6 元の投稿イベントの処理
+      if (nostrEv.kind === 1 || nostrEv.kind === 6) {
+        eventCache[nostrEv.id] = nostrEv;
+        eventsToFetch.delete(nostrEv.id);
+        updateOriginalPostView(nostrEv.id);
+        return;
+      }
+    
+      // kind:7 リアクションイベントの処理
+      if (nostrEv.kind === 7) {
+        if (seenEventIds.has(nostrEv.id)) {
+          return;
+        }
+        seenEventIds.add(nostrEv.id);
+        const newReactionView = reactionEventView(nostrEv);
+        timeline.appendChild(newReactionView);
+        oldestCreatedAt = Math.min(oldestCreatedAt, nostrEv.created_at);
+    
+        if (!profileCache[nostrEv.pubkey] && !pubkeysToFetchProfile.has(nostrEv.pubkey)) {
+          pubkeysToFetchProfile.add(nostrEv.pubkey);
+          scheduleProfileFetch();
+        }
+      }
+    }
+    
+    // === プロフィール情報の遅延取得処理 ===
+    function scheduleProfileFetch() {
+      if (profileFetchTimeout) {
+        clearTimeout(profileFetchTimeout);
+      }
+      profileFetchTimeout = setTimeout(() => {
+        for (const ws of reactionWSs) {
+          if (pubkeysToFetchProfile.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+            const pubkeys = Array.from(pubkeysToFetchProfile);
+            const subId = "PROFILE_SUB_ID_REACTIONS_" + Date.now();
+            ws.send(JSON.stringify(["REQ", subId, {
+              kinds: [0],
+              authors: pubkeys,
+              limit: pubkeys.length
+            }]));
+          }
+        }
+        profileFetchTimeout = null;
+      }, 100);
+    }
+    
+    // === リレー接続とイベント購読処理 ===
+    function subscribeToReactionRelay() {
+      reactionWSs.forEach(ws => {
+        ws.removeEventListener("close", onReactionWSClose);
+        ws.close();
+      });
+      reactionWSs.length = 0;
+      clearTimeline();
+      
+      // ユーザー入力からリレーURLを取得し、カンマで分割
+      const relayUrls = relayUrlInput.value.split(',').map(url => url.trim()).filter(url => url.length > 0);
+      if (relayUrls.length === 0) {
+        alert("リレーURLが入力されていません。");
+        return;
+      }
+    
+      for (const relayUrl of relayUrls) {
+        let reactionWS;
+        try {
+          reactionWS = new WebSocket(relayUrl);
+          reactionWSs.push(reactionWS);
+        } catch (err) {
+          console.error("Failed to connect to relay:", err);
+          alert("Failed to connect to relay: " + relayUrl);
+          continue;
+        }
+    
+        reactionWS.addEventListener("open", function() {
+          console.log("Connected to relay:", relayUrl);
+          if (currentTargetPubkeyForReactions) {
+            reactionWS.send(
+              JSON.stringify(["REQ", REACTION_SUB_ID, {
+                kinds: [7],
+                "#p": [currentTargetPubkeyForReactions],
+                limit: 50
+              }])
+            );
+          } else {
+            loadMoreButton.classList.remove("loading");
+          }
+        });
+    
+        reactionWS.addEventListener("message", function(ev) {
+          try {
+            const r2cMsg = JSON.parse(ev.data);
+            switch (r2cMsg[0]) {
+              case "EVENT":
+                const nostrEv = r2cMsg[2];
+                if (!window.NostrTools.verifyEvent(nostrEv)) {
+                  console.error("nostr event with invalid signature:", nostrEv);
+                  return;
+                }
+                onEvent(nostrEv);
+                break;
+    
+              case "EOSE":
+                if (r2cMsg[1] === REACTION_SUB_ID || r2cMsg[1] === MORE_REACTIONS_SUB_ID) {
+                  loadMoreButton.classList.remove("loading");
+                }
+                break;
+    
+              case "OK":
+                break;
+              case "NOTICE":
+                console.warn("Relay Notice:", r2cMsg[1]);
+                break;
+              default:
+                console.log(r2cMsg);
+                break;
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        });
+    
+        reactionWS.addEventListener("close", onReactionWSClose);
+      }
+    }
+    
+    // === リレー切断時の再接続処理 ===
+    function onReactionWSClose() {
+      console.log("Relay connection closed. Attempting to reconnect...");
+      setTimeout(subscribeToReactionRelay, 5000);
+    }
+    
+    // === NIP-05検証関数 ===
+    async function fetchPubkeyFromNip05(nip05) {
+      const [user, domain] = nip05.split('@');
+      if (!user || !domain) {
+        throw new Error("Invalid NIP-05 address format.");
+      }
+    
+      const url = `https://${domain}/.well-known/nostr.json?name=${user}`;
+    
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch NIP-05 data: ${response.statusText}`);
+        }
+    
+        const data = await response.json();
+        const pubkey = data.names[user];
+        if (!pubkey) {
+          throw new Error(`User "${user}" not found in NIP-05 data.`);
+        }
+        return pubkey;
+      } catch (e) {
+        console.error("NIP-05 verification failed:", e);
+        throw e;
+      }
+    }
+    
+    // ==== イベントリスナー ====
+    applyPubkeyForReactionsButton.addEventListener("click", async function() {
+      const inputVal = targetHexPubkeyInput.value.trim();
+      let hexPubkey;
+    
+      if (inputVal.startsWith("npub1")) {
+        try {
+          const { type, data } = window.NostrTools.nip19.decode(inputVal);
+          if (type === "npub") {
+            hexPubkey = data;
+          } else {
+            throw new Error("Invalid npub key.");
+          }
+        } catch (e) {
+          console.error("Failed to decode npub:", e);
+          alert("有効なnpub公開鍵ではありません。");
+          currentTargetPubkeyForReactions = undefined;
+          clearTimeline();
+          return;
+        }
+      } else if (inputVal.includes("@")) {
+        try {
+          hexPubkey = await fetchPubkeyFromNip05(inputVal);
+        } catch (e) {
+          alert("有効なNIP-05アドレスではありません。");
+          currentTargetPubkeyForReactions = undefined;
+          clearTimeline();
+          return;
+        }
+      } else if (inputVal.length === 64 && /^[0-9a-fA-F]+$/.test(inputVal)) {
+        hexPubkey = inputVal;
+      } else {
+        alert("有効なhex、npub、またはNIP-05公開鍵を入力してください。");
+        currentTargetPubkeyForReactions = undefined;
+        clearTimeline();
+        return;
+      }
+    
+      currentTargetPubkeyForReactions = hexPubkey;
+      console.log("Subscribing reactions for pubkey:", currentTargetPubkeyForReactions);
+      // ここも変更：ボタンが押されたときにもリレーに接続する
+      subscribeToReactionRelay();
+    });
+    
+    const loadMoreButton = document.getElementById("load-more");
+    
+    // === 「もっと見る」ボタンのイベントハンドラ ===
+    function fetchMoreReactions() {
+      if (!reactionWSs.some(ws => ws && ws.readyState === WebSocket.OPEN) || !currentTargetPubkeyForReactions) {
+        console.warn("Relay not connected or no target pubkey set.");
+        return;
+      }
+      loadMoreButton.classList.add("loading");
+    
+      const filter = {
+        kinds: [7],
+        limit: 50,
+        until: oldestCreatedAt - 1,
+        "#p": [currentTargetPubkeyForReactions]
+      };
+      for (const ws of reactionWSs) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(["REQ", MORE_REACTIONS_SUB_ID, filter]));
+        }
+      }
+    }
+    loadMoreButton.addEventListener("click", fetchMoreReactions);
+    
+    // === 初期化処理 ===
+    document.addEventListener("DOMContentLoaded", function() {
+      // ページロード時の自動接続を削除
+      // subscribeToReactionRelay();
+    
+      // 新しいボタンにイベントリスナーを追加
+      connectRelayButton.addEventListener("click", subscribeToReactionRelay);
+    
+      // ローカルストレージから前回のリレーURLを読み込む
+      const savedRelayUrls = localStorage.getItem('relayUrls');
+      if (savedRelayUrls) {
+        relayUrlInput.value = savedRelayUrls;
+      }
+    });
 </script>
 <script src="https://ompomz.github.io/header/loadHeader.js"></script>
 </body>
