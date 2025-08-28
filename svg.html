@@ -507,7 +507,7 @@ function postEventView(nostrEv) {
     }
     pressTimer = setTimeout(() => {
       clearTimeout(pressTimer);
-      if (confirm("☆ふぁぼる？")) {
+      if (confirm("☆ふぁぼる？※ふぁぼるには鍵が必要です。")) {
         sendLikeEvent(nostrEv.id, nostrEv.pubkey);
       }
     }, 800);
@@ -523,7 +523,7 @@ function postEventView(nostrEv) {
   view.addEventListener('touchstart', (e) => {
     pressTimer = setTimeout(() => {
       clearTimeout(pressTimer);
-      if (confirm("☆ふぁぼる？")) {
+      if (confirm("☆ふぁぼる？※ふぁぼるには鍵が必要です。")) {
         sendLikeEvent(nostrEv.id, nostrEv.pubkey);
       }
     }, 800);
@@ -603,7 +603,7 @@ async function sendLikeEvent(targetEventId, targetPubkey) {
         alert("なんかふぁぼれなかったごめん。");
       }
     } else {
-      alert("ふぁぼりたかったら、秘密鍵を入力（生成）するか、ブラウザ拡張機能でログインしてね。");
+      alert("ふぁぼるには鍵が必要です。鍵ペアを生成するか、既存の秘密鍵を入力するか、ブラウザ拡張機能でログインしてね。");
     }
   } else { // 秘密鍵入力でログイン
     try {
