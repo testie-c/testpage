@@ -11,7 +11,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 .container { max-width: 600px; margin-left: 0.5rem; margin-right: auto; padding: 0.5rem 0.5rem 0rem 0.5rem; }
 @media (max-width: 767px) { .container { max-width: 100%; padding: 8px 8px 0px 8px; margin: 0; } }
 @media (max-width: 400px) { .flex-container button {font-size: 0.6rem !important;} }
-.auto-stop-message { width: 100%; max-width: 600px; margin: 0 auto; padding-bottom: 0.5rem; color: #666; text-align: center; }
+.auto-stop-message { display: block; width: 100%; max-width: 600px; margin: 0 auto; padding-bottom: 0.5rem; color: #666; text-align: center; }
 @media (max-width: 767px) { .auto-stop-message { max-width: 100%; } }
 h1 { font-size: 1.2rem; margin: 0rem 0rem 0.5rem 0rem; }
 p { margin: 0; }
@@ -53,7 +53,7 @@ li.event { word-break: break-all; padding: 0.5rem; border-top: 1px dashed #ddd; 
 <div id="header-placeholder"></div>
 <div class="container">
 <a href="https://github.com/ompomz/flowgazer/"><h1>flowgazer -kindness edition-</h1></a>
-<p>このページでは、鍵を作って・投稿して・タイムラインを見ることができるよ。作ったのはGemini。</p>
+<p>Nostrを「体験」してみてほしい！<br>このページでは、タイムラインを見たり、鍵ペアを作って投稿したり、ふぁぼったりすることができるよ。作ったのはGemini。</p>
 <div class="flex-container">
 <button id="generate-keypair" style="flex-grow:1;">新しい鍵ペアを生成して試す</button>
 <button id="get-from-extension" class="hidden" style="flex-grow:1;">ブラウザ拡張機能からログイン</button>
