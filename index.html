@@ -1,1 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>削除</title>
+  <style>
+  </style>
+</head>
+<body>
+  <p>削除</p>
+  <label for="privkey">秘密鍵（hex形式）</label>
+  <input type="text" id="privkey" placeholder="例: nsec..." />
+  <label for="eventId">削除したいイベントID</label>
+  <input type="text" id="eventId" placeholder="nevent.../note..." />
+  <label for="relays">リレーURL（改行区切りで複数可）</label>
+  <textarea id="relays" rows="4" placeholder="例:\nwss://relay.nostr.example\nwss://nostr-relay.jp"></textarea>
+  <button id="sendBtn">削除イベントを送信</button>
+  <div id="result"></div>
+  <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+  <script>
+  document.getElementById('sendBtn').addEventListener('click', async () => {
+    const privkeyInput = document.getElementById('privkey').value.trim();
+    const eventId = document.getElementById('eventId').value.trim();
+    const relayList = document.getElementById('relays').value.trim().split('\n').filter(r => r);
 
+    const resultDiv = document.getElementById('result');
+    resultDiv.textContent = '処理中...';
+
+    try {
+      // nsec形式 → hex形式に変換
+      let sk;
+      if (privkeyInput.startsWith('nsec')) {
+        sk = NostrTools.nip19.decode(privkeyInput).data;
+      } else {
+        sk = privkeyInput;
+      }
+
+      const pubkey = NostrTools.getPublicKey(sk);
+
+      // 削除イベントの生成
+      const event = {
+        kind: 5,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['e', eventId]],
+        content: '',
+        pubkey: pubkey,
+      };
+
+      // 署名
+      event.id = NostrTools.getEventHash(event);
+      event.sig = NostrTools.signEvent(event, sk);
+
+      // リレーに送信
+      const results = [];
+      for (const url of relayList) {
+        const socket = new WebSocket(url);
+        await new Promise((resolve, reject) => {
+          socket.onopen = () => {
+            socket.send(JSON.stringify(['EVENT', event]));
+            results.push(`✅ 送信成功: ${url}`);
+            socket.close();
+            resolve();
+          };
+          socket.onerror = () => {
+            results.push(`❌ 送信失敗: ${url}`);
+            resolve(); // エラーでも次へ
+          };
+        });
+      }
+
+      resultDiv.textContent = results.join('\n');
+    } catch (err) {
+      resultDiv.textContent = '⚠️ エラー: ' + err.message;
+    }
+  });
+</script>
+</body>
+</html>
