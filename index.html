@@ -1,146 +1,142 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <title>イベント削除ツール</title>
-    </head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nostr Note Deletion Tool</title>
+</head>
 <body>
-    <p>指定したイベントを削除するイベントをリレーに送信します。</p>
-    <label for="privkey">秘密鍵（hex形式またはnsec形式）</label>
-    <input type="text" id="privkey" placeholder="例: nsec..." />
-    <label for="eventId">削除したいイベントID</label>
-    <input type="text" id="eventId" placeholder="例: nevent1..., note1... または hex形式" />
-    <label for="relays">リレーURL（改行区切りで複数可）</label>
-    <textarea id="relays" rows="4" placeholder="例:&#10;wss://relay.nostr.example&#10;wss://nostr-relay.jp"></textarea>
-    <button id="sendBtn">削除イベントを送信</button>
-    <div id="result"></div>
-    <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+    <p>kind:1のNoteを削除するためのツールです。削除したいNoteのIDと秘密鍵を入力し、kind:5イベントをリレーに送信します。</p>
+    <label for="noteId">削除したいNote ID (e.g., note1...):</label>
+    <input type="text" id="noteId" placeholder="note1z2he85z0vvy5h74tfk5zdkhjqll485vnhlyt9calz9gggn8al7rsyahpx8">
+    <label for="relays">Kind:5を送信するリレーURL (複数指定可、改行区切り):</label>
+    <textarea id="relays" rows="5" placeholder="wss://relay.damus.io&#10;wss://nos.lol"></textarea>
+    <label for="privateKeyHex">秘密鍵 (hex):</label>
+    <input type="text" id="privateKeyHex" placeholder="例: c968153d... (注意: 公開しないように!)">
+    <button id="createJsonButton">JSONを作成</button>
+    <button id="signAndSendButton" disabled>署名して送信</button>
+    <pre id="eventJsonPreview"></pre>
+    <div id="results">結果がここに表示されます。</div>
+    <script src="https://unpkg.com/nostr-tools/lib/nostr.min.js"></script>
     <script>
-        document.getElementById('sendBtn').addEventListener('click', async () => {
-            const privkeyInput = document.getElementById('privkey').value.trim();
-            const eventIdInput = document.getElementById('eventId').value.trim();
-            const relayList = document.getElementById('relays').value.trim().split('\n').filter(r => r);
-            const resultDiv = document.getElementById('result');
-            resultDiv.textContent = '処理中...';
+        const { nip19, getEventHash, signEvent, getPublicKey, finalizeEvent } = window.NostrTools;
 
-            if (!privkeyInput || !eventIdInput || relayList.length === 0) {
-                resultDiv.textContent = '⚠️ エラー: すべての項目を入力してください。';
+        const noteIdInput = document.getElementById('noteId');
+        const relaysInput = document.getElementById('relays');
+        const privateKeyHexInput = document.getElementById('privateKeyHex');
+        const createJsonButton = document.getElementById('createJsonButton');
+        const signAndSendButton = document.getElementById('signAndSendButton');
+        const eventJsonPreview = document.getElementById('eventJsonPreview');
+        const resultsDiv = document.getElementById('results');
+
+        let eventToSign = null;
+
+        createJsonButton.addEventListener('click', () => {
+            resultsDiv.innerHTML = '';
+            const noteId = noteIdInput.value.trim();
+            const privateKeyHex = privateKeyHexInput.value.trim();
+
+            if (!noteId || !privateKeyHex) {
+                resultsDiv.innerHTML = '<span class="error">Note IDと秘密鍵をすべて入力してください。</span>';
                 return;
             }
 
             try {
-                // 秘密鍵をデコード
-                let sk;
-                if (privkeyInput.startsWith('nsec')) {
-                    const { type, data } = NostrTools.nip19.decode(privkeyInput);
-                    if (type !== 'nsec') throw new Error('無効なnsec形式です。');
-                    sk = data;
-                } else {
-                    sk = privkeyInput;
+                // Note IDをイベントIDに変換
+                const { type, data } = nip19.decode(noteId);
+                if (type !== 'note' && type !== 'nevent') {
+                    throw new Error('無効なNote IDです。');
                 }
-                if (sk.length !== 64 || !/^[0-9a-fA-F]+$/.test(sk)) {
-                    throw new Error('無効なhex形式の秘密鍵です。');
-                }
-                const pubkey = NostrTools.getPublicKey(sk);
+                const eventId = typeof data === 'string' ? data : data.id;
+                
+                // 公開鍵を生成
+                const pubkey = getPublicKey(privateKeyHex);
 
-                // イベントIDをデコード
-                let targetEventIdHex;
-                if (eventIdInput.startsWith('nevent1') || eventIdInput.startsWith('note1')) {
-                    const { type, data } = NostrTools.nip19.decode(eventIdInput);
-                    if (type === 'nevent') {
-                        targetEventIdHex = data.id;
-                    } else if (type === 'note') {
-                        targetEventIdHex = data;
-                    } else {
-                        throw new Error('無効なイベントID形式です。');
-                    }
-                } else {
-                    targetEventIdHex = eventIdInput;
-                }
-                if (targetEventIdHex.length !== 64 || !/^[0-9a-fA-F]+$/.test(targetEventIdHex)) {
-                    throw new Error('無効なhex形式のイベントIDです。');
-                }
-
-                // 削除イベント（Kind:5）の生成
-                const event = {
+                // kind:5イベントの構成
+                eventToSign = {
                     kind: 5,
                     created_at: Math.floor(Date.now() / 1000),
-                    tags: [['e', targetEventIdHex]],
-                    content: '',
+                    tags: [['e', eventId]],
+                    content: 'Note deleted by user.',
                     pubkey: pubkey,
                 };
-                event.id = NostrTools.getEventHash(event);
-                event.sig = NostrTools.signEvent(event, sk);
+                
+                const finalEvent = finalizeEvent(eventToSign, privateKeyHex);
 
-                // リレーに送信
-                const results = [];
-                for (const url of relayList) {
-                    await new Promise((resolve) => {
-                        const socket = new WebSocket(url);
-                        let isResolved = false;
-                        const timeout = setTimeout(() => {
-                            if (!isResolved) {
-                                results.push(`⚠️ タイムアウト: ${url}`);
-                                socket.close();
-                                resolve();
-                            }
-                        }, 5000); // 5秒でタイムアウト
+                eventJsonPreview.textContent = JSON.stringify(finalEvent, null, 2);
+                signAndSendButton.disabled = false;
+                resultsDiv.innerHTML = '<span class="success">JSONが作成されました。内容を確認し、「署名して送信」ボタンを押してください。</span>';
 
-                        socket.onopen = () => {
-                            socket.send(JSON.stringify(['EVENT', event]));
-                            console.log(`送信イベントをリレー ${url} に送信`);
-                        };
+            } catch (e) {
+                eventJsonPreview.textContent = '';
+                signAndSendButton.disabled = true;
+                resultsDiv.innerHTML = `<span class="error">エラー: ${e.message}</span>`;
+            }
+        });
 
-                        socket.onmessage = (msg) => {
-                            const r2c = JSON.parse(msg.data);
-                            if (r2c[0] === 'OK' && r2c[1] === event.id) {
-                                if (r2c[2] === true) {
-                                    results.push(`✅ OK: ${url} (削除成功)`);
-                                } else {
-                                    // OKメッセージがfalseの場合、リレーが削除を拒否したことを示す
-                                    results.push(`❌ OK: ${url} (削除拒否: ${r2c[3]})`);
-                                }
-                                clearTimeout(timeout);
-                                if (!isResolved) {
-                                    isResolved = true;
-                                    socket.close();
-                                    resolve();
-                                }
-                            } else if (r2c[0] === 'NOTICE') {
-                                results.push(`❌ NOTICE: ${url} (${r2c[1]})`);
-                                clearTimeout(timeout);
-                                if (!isResolved) {
-                                    isResolved = true;
-                                    socket.close();
-                                    resolve();
-                                }
-                            }
-                        };
+        signAndSendButton.addEventListener('click', async () => {
+            if (!eventToSign) {
+                resultsDiv.innerHTML = '<span class="error">先にJSONを作成してください。</span>';
+                return;
+            }
 
-                        socket.onerror = (e) => {
-                            results.push(`❌ 接続エラー: ${url}`);
-                            console.error(`WebSocket Error for ${url}:`, e);
-                            clearTimeout(timeout);
-                            if (!isResolved) {
-                                isResolved = true;
-                                resolve();
-                            }
-                        };
-                        
-                        // 接続が切断された場合
-                        socket.onclose = () => {
-                            if (!isResolved) {
-                                results.push(`⚠️ 接続切断: ${url}`);
-                                isResolved = true;
-                                resolve();
+            signAndSendButton.disabled = true;
+            resultsDiv.innerHTML = '送信中...';
+
+            const relays = relaysInput.value.trim().split('\n').filter(url => url.startsWith('wss://') || url.startsWith('ws://'));
+            const privateKeyHex = privateKeyHexInput.value.trim();
+
+            if (relays.length === 0) {
+                resultsDiv.innerHTML = '<span class="error">有効なリレーURLが入力されていません。</span>';
+                signAndSendButton.disabled = false;
+                return;
+            }
+
+            const event = finalizeEvent(eventToSign, privateKeyHex);
+
+            resultsDiv.innerHTML = '';
+
+            for (const relayUrl of relays) {
+                const relayResultDiv = document.createElement('div');
+                relayResultDiv.innerHTML = `<h3>${relayUrl}</h3>`;
+                resultsDiv.appendChild(relayResultDiv);
+
+                try {
+                    const ws = new WebSocket(relayUrl);
+
+                    ws.onopen = () => {
+                        relayResultDiv.innerHTML += '<p>接続成功。イベントを送信中...</p>';
+                        ws.send(JSON.stringify(['EVENT', event]));
+                    };
+
+                    ws.onmessage = (message) => {
+                        const msg = JSON.parse(message.data);
+                        if (msg[0] === 'OK') {
+                            const [ok, eventId, success, reason] = msg;
+                            if (success) {
+                                relayResultDiv.innerHTML += `<p class="success">✅ <b>送信成功:</b> ${reason || ''}</p>`;
+                            } else {
+                                relayResultDiv.innerHTML += `<p class="error">❌ <b>送信失敗:</b> ${reason || '不明なエラー'}</p>`;
                             }
                         }
-                    });
+                        ws.close();
+                    };
+
+                    ws.onerror = (e) => {
+                        relayResultDiv.innerHTML += `<p class="error">❌ 接続エラー: ${e.message}</p>`;
+                        ws.close();
+                    };
+
+                    ws.onclose = () => {
+                        relayResultDiv.innerHTML += '<hr>';
+                    };
+
+                } catch (e) {
+                    relayResultDiv.innerHTML += `<p class="error">❌ 接続または送信中にエラーが発生しました: ${e.message}</p><hr>`;
                 }
-                resultDiv.textContent = results.join('\n');
-            } catch (err) {
-                resultDiv.textContent = '⚠️ エラー: ' + err.message;
             }
+
+            signAndSendButton.disabled = false;
         });
     </script>
 </body>
