@@ -31,7 +31,7 @@ export const updateProfile = (nostrEv, profiles) => {
   try {
     const profileContent = JSON.parse(nostrEv.content);
     profiles[nostrEv.pubkey] = profileContent;
-    console.log(`公開鍵: ${nostrEv.pubkey.substring(0, 8)}... のプロファイルを更新しました。`);
+    // console.log(`公開鍵: ${nostrEv.pubkey.substring(0, 8)}... のプロファイルを更新しました。`);
   } catch (error) {
     console.error("プロフィールコンテンツのパースに失敗しました:", error);
   }
@@ -68,7 +68,7 @@ export const fetchProfilesForPubkeys = (pubkeysToFetch, profiles, onProfilesFetc
   }
 
   if (pubkeys.size === 0) {
-    console.log("フェッチ対象のプロファイルはありませんでした。");
+    // console.log("フェッチ対象のプロファイルはありませんでした。");
     return;
   }
 
@@ -87,7 +87,7 @@ export const fetchProfilesForPubkeys = (pubkeysToFetch, profiles, onProfilesFetc
     let timeoutId;
 
     profileRelayWS.addEventListener("open", () => {
-      console.log(`プロファイルリレーに接続しました: ${currentRelayUrl}`);
+      // console.log(`プロファイルリレーに接続しました: ${currentRelayUrl}`);
       profileRelayWS.send(JSON.stringify(["REQ", PROFILE_SUB_ID, {
         kinds: [0],
         authors: Array.from(pubkeys)
@@ -110,7 +110,7 @@ export const fetchProfilesForPubkeys = (pubkeysToFetch, profiles, onProfilesFetc
             onProfilesFetched();
           }
         } else if (r2cMsg[0] === "EOSE" && r2cMsg[1] === PROFILE_SUB_ID) {
-          console.log(`プロファイルリレー ${currentRelayUrl} からEOSEを受信しました。`);
+          // console.log(`プロファイルリレー ${currentRelayUrl} からEOSEを受信しました。`);
           clearTimeout(timeoutId);
           profileRelayWS.close();
         }
@@ -121,7 +121,7 @@ export const fetchProfilesForPubkeys = (pubkeysToFetch, profiles, onProfilesFetc
 
     profileRelayWS.addEventListener("close", () => {
       clearTimeout(timeoutId);
-      console.log(`プロファイルリレー ${currentRelayUrl} との接続が閉じられました。`);
+      // console.log(`プロファイルリレー ${currentRelayUrl} との接続が閉じられました。`);
       // 次のリレーを試す
       relayIndex++;
       tryNextRelay();
