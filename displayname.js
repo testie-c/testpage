@@ -11,7 +11,7 @@ const pubkeysInProgress = new Set();
 const PROFILE_RELAYS = [
   "wss://relay.nostr.band",
   "wss://relay-jp.nostr.wirednet.jp/",
-  "wss://nostr.damus.io"
+  "wss://relay.damus.io"
 ];
 
 /**
