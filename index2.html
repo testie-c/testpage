@@ -130,41 +130,18 @@ return;
 const sinceTime = Math.floor(date.setHours(0, 0, 0, 0) / 1000);
 const untilTime = Math.floor(date.setHours(23, 59, 59, 999) / 1000);
 try {
-const relayUrlsToSearch = new Set();
-relayUrlsToSearch.add(RELAY_URL);
-// Kind:10002 (リレーリスト) を取得し、検索対象リレーに追加
-console.log(`[Log] ハードコードされたリレー ${RELAY_URL} への接続を開始します...`);
-const mainRelay = NostrTools.relayInit(RELAY_URL);
-await mainRelay.connect();
-console.log(`[Log] リレー ${RELAY_URL} に接続しました。kind:10002を購読...`);
-const sub10002 = mainRelay.sub([{ kinds: [10002], authors: [pubkey] }]);
-sub10002.on('event', (event) => {
-event.tags.forEach(tag => {
-if (tag[0] === 'r' && tag[1].startsWith('wss://')) {
-relayUrlsToSearch.add(tag[1]);
-}
+// NostrTools.relayInit を使用 (バージョン1.17.0の挙動)
+console.log(`[Log] リレー ${RELAY_URL} への接続を開始...`);
+const relay = NostrTools.relayInit(RELAY_URL);
+relay.on('error', () => {
+statusMessage.textContent = `リレー ${RELAY_URL} への接続に失敗しました。`;
+console.error(`[Error] リレー ${RELAY_URL} への接続に失敗しました。`);
 });
-});
-await new Promise(resolve => sub10002.on('eose', () => {
-mainRelay.close();
-console.log(`[Log] リレー ${RELAY_URL} の購読が終了しました。`);
-console.log(`[Log] 検索対象リレーは以下の通りです:`, Array.from(relayUrlsToSearch));
-resolve();
-}));
-// 取得したリレーからKind:1とKind:42の投稿を検索
-const kinds1And42Events = new Map();
-const relayPromises = Array.from(relayUrlsToSearch).map(relayUrl => {
-return new Promise(async (resolve) => {
-try {
-console.log(`[Log] リレー ${relayUrl} への接続を開始します...`);
-const postRelay = NostrTools.relayInit(relayUrl);
-postRelay.on('error', (e) => {
-console.error(`[Error] リレー ${relayUrl} への接続に失敗しました。`, e);
-resolve();
-});
-await postRelay.connect();
-console.log(`[Log] リレー ${relayUrl} に接続成功。kind:1, 42 を購読...`);
-const sub1 = postRelay.sub([
+await relay.connect();
+console.log(`[Log] リレー ${RELAY_URL} に接続しました。`);
+const kinds1Events = []; // Kind:1,42の投稿を格納
+// Kind:1とKind:42の投稿を検索
+const sub1 = relay.sub([
 {
 kinds: [1, 42],
 authors: [pubkey],
@@ -173,25 +150,15 @@ until: untilTime,
 }
 ]);
 sub1.on('event', (event) => {
-kinds1And42Events.set(event.id, event);
+kinds1Events.push(event);
 });
 sub1.on('eose', () => {
-postRelay.close();
-console.log(`[Log] リレー ${relayUrl} の購読が終了しました。`);
-resolve();
+console.log(`[Log] リレー ${RELAY_URL} の購読が終了しました。`);
+displayResults(kinds1Events);
+relay.close();
 });
-} catch (e) {
-console.error(`[Error] リレー ${relayUrl} で予期せぬエラーが発生しました:`, e);
-resolve();
-}
-});
-});
-await Promise.all(relayPromises);
-console.log(`[Log] すべてのリレーからの投稿取得が完了しました。`);
-displayResults(Array.from(kinds1And42Events.values()));
 } catch (e) {
 statusMessage.textContent = `エラーが発生しました: ${e.message}`;
-console.error('[Fatal Error]', e);
 }
 };
 // 検索結果を表示する関数
