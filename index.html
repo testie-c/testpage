@@ -133,13 +133,17 @@ try {
 // 検索対象のリレーリストを初期化
 const relayUrlsToSearch = new Set();
 relayUrlsToSearch.add(RELAY_URL);
+console.log(`[Start] メインリレー ${RELAY_URL} への接続を開始します...`);
 const mainRelay = NostrTools.relayInit(RELAY_URL);
 mainRelay.on('error', () => {
+console.error(`[Error] メインリレー ${RELAY_URL} への接続に失敗しました。`);
 statusMessage.textContent = 'メインリレーへの接続に失敗しました。';
 });
 await mainRelay.connect();
+console.log(`[Success] メインリレー ${RELAY_URL} に接続しました。`);
 // Kind:1とKind:42の投稿を検索
 const kinds1And42Events = [];
+console.log(`[Search] メインリレーで kind:1, 42 のイベントを購読開始します。`);
 const sub1 = mainRelay.sub([
 {
 kinds: [1, 42],
@@ -149,31 +153,43 @@ until: untilTime,
 }
 ]);
 sub1.on('event', (event) => {
+console.log(`[Event] kind:${event.kind} イベントをメインリレーから受信しました (ID: ${event.id.substring(0, 8)}...)`);
 kinds1And42Events.push(event);
 // neventに含まれるリレーヒントを収集
 const relaysTag = event.tags.find(tag => tag[0] === 'relays');
 if (relaysTag && Array.isArray(relaysTag) && relaysTag.length > 1) {
-relaysTag.slice(1).forEach(url => relayUrlsToSearch.add(url));
+relaysTag.slice(1).forEach(url => {
+if (url.startsWith('wss://')) {
+relayUrlsToSearch.add(url);
+console.log(`[Hint] イベントから新しいリレーヒントを検出しました: ${url}`);
+}
+});
 }
 });
 sub1.on('eose', async () => {
+console.log(`[EOSE] メインリレーの kind:1, 42 購読が終了しました。`);
 mainRelay.close();
 const eventIds = new Set(kinds1And42Events.map(e => e.id));
 if (eventIds.size === 0) {
+console.log('[Result] 投稿が見つかりませんでした。');
 displayResults([], []);
 return;
 }
+console.log(`[Summary] 合計 ${kinds1And42Events.length} 件の投稿が見つかりました。`);
+console.log(`[Next Step] 以下のリレーから kind:6, 7 のリアクションを検索します:`, Array.from(relayUrlsToSearch));
 statusMessage.textContent = `投稿 ${kinds1And42Events.length} 件を検索しました。リアクション情報を取得中...`;
-const reactions = new Set();
+const reactionEvents = new Map(); // 重複排除のためMapを使用
 const relayPromises = Array.from(relayUrlsToSearch).map(relayUrl => {
 return new Promise(async (resolve) => {
 try {
+console.log(`[Start] リアクション検索のため ${relayUrl} への接続を開始します...`);
 const reactionRelay = NostrTools.relayInit(relayUrl);
 reactionRelay.on('error', (e) => {
-console.error(`リレー ${relayUrl} への接続に失敗:`, e);
+console.error(`[Error] リレー ${relayUrl} への接続に失敗しました。`, e);
 resolve(); // 失敗しても次のリレーへ
 });
 await reactionRelay.connect();
+console.log(`[Success] リレー ${relayUrl} に接続しました。kind:6, 7 を購読開始...`);
 const sub2 = reactionRelay.sub([
 {
 kinds: [6, 7],
@@ -181,29 +197,29 @@ kinds: [6, 7],
 }
 ]);
 sub2.on('event', (event) => {
-// イベントIDで重複を排除
-if (!reactions.has(event.id)) {
-reactions.add(event.id);
+console.log(`[Event] kind:${event.kind} イベントをリレー ${relayUrl} から受信しました (ID: ${event.id.substring(0, 8)}...)`);
+if (!reactionEvents.has(event.id)) {
+reactionEvents.set(event.id, event);
 }
 });
 sub2.on('eose', () => {
+console.log(`[EOSE] リレー ${relayUrl} の購読が終了しました。`);
 reactionRelay.close();
 resolve();
 });
 } catch (e) {
-console.error(`リレー ${relayUrl} でエラー:`, e);
+console.error(`[Error] リレー ${relayUrl} で予期せぬエラーが発生しました:`, e);
 resolve();
 }
 });
 });
 await Promise.all(relayPromises);
-const reactionEvents = Array.from(reactions).map(id => {
-return kinds1And42Events.find(e => e.id === id) || { id, tags: [] };
-});
-displayResults(kinds1And42Events, reactionEvents);
+console.log(`[Summary] 全リレーからのリアクションイベントの取得が完了しました。`);
+displayResults(kinds1And42Events, Array.from(reactionEvents.values()));
 });
 } catch (e) {
 statusMessage.textContent = `エラーが発生しました: ${e.message}`;
+console.error('[Fatal Error]', e);
 }
 };
 // 検索結果を表示する関数
@@ -232,6 +248,7 @@ reactionCounts[targetEventId].reactions++;
 }
 }
 });
+console.log(`[Rendering] 合計 ${reactions.length} 件のリアクションイベントを処理しました。`);
 // 結果をHTMLにレンダリング
 posts.forEach(post => {
 const postElement = document.createElement('div');
