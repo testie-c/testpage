@@ -130,21 +130,31 @@ return;
 const sinceTime = Math.floor(date.setHours(0, 0, 0, 0) / 1000);
 const untilTime = Math.floor(date.setHours(23, 59, 59, 999) / 1000);
 try {
-// 検索対象のリレーリストを初期化
 const relayUrlsToSearch = new Set();
 relayUrlsToSearch.add(RELAY_URL);
-console.log(`[Start] メインリレー ${RELAY_URL} への接続を開始します...`);
+// Kind:10002 (リレーリスト) を取得し、検索対象リレーに追加
+console.log(`[Step 1] Kind:10002イベントからフォローしているリレーリストを取得します...`);
 const mainRelay = NostrTools.relayInit(RELAY_URL);
-mainRelay.on('error', () => {
-console.error(`[Error] メインリレー ${RELAY_URL} への接続に失敗しました。`);
-statusMessage.textContent = 'メインリレーへの接続に失敗しました。';
-});
 await mainRelay.connect();
-console.log(`[Success] メインリレー ${RELAY_URL} に接続しました。`);
+const sub10002 = mainRelay.sub([{ kinds: [10002], authors: [pubkey] }]);
+sub10002.on('event', (event) => {
+event.tags.forEach(tag => {
+if (tag[0] === 'r' && tag[1].startsWith('wss://')) {
+relayUrlsToSearch.add(tag[1]);
+}
+});
+});
+await new Promise(resolve => sub10002.on('eose', () => {
+mainRelay.close();
+console.log(`[Step 1] Kind:10002イベントの購読が完了しました。検索対象リレーは以下の通りです:`, Array.from(relayUrlsToSearch));
+resolve();
+}));
 // Kind:1とKind:42の投稿を検索
+console.log(`[Step 2] メインリレーから kind:1, 42 のイベントを検索します...`);
 const kinds1And42Events = [];
-console.log(`[Search] メインリレーで kind:1, 42 のイベントを購読開始します。`);
-const sub1 = mainRelay.sub([
+const postRelay = NostrTools.relayInit(RELAY_URL);
+await postRelay.connect();
+const sub1 = postRelay.sub([
 {
 kinds: [1, 42],
 authors: [pubkey],
@@ -153,57 +163,48 @@ until: untilTime,
 }
 ]);
 sub1.on('event', (event) => {
-console.log(`[Event] kind:${event.kind} イベントをメインリレーから受信しました (ID: ${event.id.substring(0, 8)}...)`);
 kinds1And42Events.push(event);
-// neventに含まれるリレーヒントを収集
-const relaysTag = event.tags.find(tag => tag[0] === 'relays');
-if (relaysTag && Array.isArray(relaysTag) && relaysTag.length > 1) {
-relaysTag.slice(1).forEach(url => {
-if (url.startsWith('wss://')) {
-relayUrlsToSearch.add(url);
-console.log(`[Hint] イベントから新しいリレーヒントを検出しました: ${url}`);
-}
 });
-}
-});
-sub1.on('eose', async () => {
-console.log(`[EOSE] メインリレーの kind:1, 42 購読が終了しました。`);
-mainRelay.close();
+await new Promise(resolve => sub1.on('eose', () => {
+postRelay.close();
+console.log(`[Step 2] 投稿の検索が完了しました。投稿数: ${kinds1And42Events.length}件。`);
+resolve();
+}));
 const eventIds = new Set(kinds1And42Events.map(e => e.id));
 if (eventIds.size === 0) {
-console.log('[Result] 投稿が見つかりませんでした。');
 displayResults([], []);
 return;
 }
-console.log(`[Summary] 合計 ${kinds1And42Events.length} 件の投稿が見つかりました。`);
-console.log(`[Next Step] 以下のリレーから kind:6, 7 のリアクションを検索します:`, Array.from(relayUrlsToSearch));
+// Kind:6とKind:7のリアクションイベントを検索
+console.log(`[Step 3] 投稿のリアクション（kind:6, 7）を、フォローリレーから検索します...`);
 statusMessage.textContent = `投稿 ${kinds1And42Events.length} 件を検索しました。リアクション情報を取得中...`;
 const reactionEvents = new Map(); // 重複排除のためMapを使用
 const relayPromises = Array.from(relayUrlsToSearch).map(relayUrl => {
 return new Promise(async (resolve) => {
 try {
-console.log(`[Start] リアクション検索のため ${relayUrl} への接続を開始します...`);
+console.log(`[Log] リレー ${relayUrl} への接続を開始...`);
 const reactionRelay = NostrTools.relayInit(relayUrl);
 reactionRelay.on('error', (e) => {
 console.error(`[Error] リレー ${relayUrl} への接続に失敗しました。`, e);
-resolve(); // 失敗しても次のリレーへ
+resolve();
 });
 await reactionRelay.connect();
-console.log(`[Success] リレー ${relayUrl} に接続しました。kind:6, 7 を購読開始...`);
+console.log(`[Log] リレー ${relayUrl} に接続成功。購読開始...`);
+const untilNow = Math.floor(Date.now() / 1000);
 const sub2 = reactionRelay.sub([
 {
 kinds: [6, 7],
 '#e': Array.from(eventIds),
+since: sinceTime,
+until: untilNow,
 }
 ]);
 sub2.on('event', (event) => {
-console.log(`[Event] kind:${event.kind} イベントをリレー ${relayUrl} から受信しました (ID: ${event.id.substring(0, 8)}...)`);
 if (!reactionEvents.has(event.id)) {
 reactionEvents.set(event.id, event);
 }
 });
 sub2.on('eose', () => {
-console.log(`[EOSE] リレー ${relayUrl} の購読が終了しました。`);
 reactionRelay.close();
 resolve();
 });
@@ -214,9 +215,8 @@ resolve();
 });
 });
 await Promise.all(relayPromises);
-console.log(`[Summary] 全リレーからのリアクションイベントの取得が完了しました。`);
+console.log(`[Step 3] すべてのリレーからのリアクションイベントの取得が完了しました。`);
 displayResults(kinds1And42Events, Array.from(reactionEvents.values()));
-});
 } catch (e) {
 statusMessage.textContent = `エラーが発生しました: ${e.message}`;
 console.error('[Fatal Error]', e);
