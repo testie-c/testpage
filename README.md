@@ -1,6 +1,5 @@
-私はNostrのイベントビューアを作っています。GitHub Pagesでホストしている静的サイトで、現在 `/tweetsrecap/` がトップページです。
-
-新たに `/tweetsrecap/tweet?nevent=nevent1...` という形式の詳細ページを作りたいです。HTMLとJavaScriptのみで構成します。
+イベントビューアを作っています。GitHub Pagesでホストしている静的サイトで、現在 `/tweetsrecap/` がトップページです。
+新たに、詳細ページを作りたいです。HTMLとJavaScriptのみで構成します。
 
 以下の仕様に沿って、詳細ページのHTMLとJavaScriptを生成してください：
 
@@ -35,7 +34,5 @@
 
 この仕様に沿って、HTMLとJavaScriptを生成してください。
 
-
 なお、JavaScriptは `<script src="https://unpkg.com/nostr-tools@1.17.0/lib/nostr.bundle.js"></script>` を使っており、`nostr-tools` の機能はグローバルスコープで利用可能です。
-
 そのため、`nip19.decode()` や `relay.send()` などは `window.nostrTools` 経由ではなく、直接使える前提でコードを生成してください。
