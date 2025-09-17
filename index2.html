@@ -120,15 +120,18 @@
 
             // リアクションと関連イベントを分類してレンダリング
             const reactions = relatedEvents.filter(e => e.kind === 7);
-            const repostsAndQuotes = relatedEvents.filter(e => e.kind === 6 || e.kind === 16);
+            const posts = relatedEvents.filter(e => e.kind === 1);
+            const reposts = relatedEvents.filter(e => e.kind === 6);
+            const quotes = relatedEvents.filter(e => e.kind === 16);
 
             if (reactions.length > 0) {
                 renderReactions(reactions);
                 console.log(`✅ ${reactions.length}件のリアクションをレンダリングしました。`);
             }
-            if (repostsAndQuotes.length > 0) {
-                renderRelatedEvents(repostsAndQuotes);
-                console.log(`✅ ${repostsAndQuotes.length}件の関連イベントをレンダリングしました。`);
+            
+            if (posts.length > 0 || reposts.length > 0 || quotes.length > 0) {
+                renderRelatedEvents(posts, reposts, quotes);
+                console.log(`✅ ${posts.length}件のリプライ、${reposts.length}件のリポスト、${quotes.length}件の引用をレンダリングしました。`);
             }
             
             showStatus(''); // 正常終了
@@ -225,18 +228,46 @@
     }
 
     /**
-     * 関連イベント（リポスト・引用）を表示
-     * @param {object[]} relatedEvents - kind:6, 16 イベントの配列
+     * 関連イベント（リポスト・引用・リプライ）を表示
+     * @param {object[]} posts - kind:1 リプライイベントの配列
+     * @param {object[]} reposts - kind:6 リポストイベントの配列
+     * @param {object[]} quotes - kind:16 引用イベントの配列
      */
-    function renderRelatedEvents(relatedEvents) {
-        relatedEvents.sort((a, b) => b.created_at - a.created_at);
+    function renderRelatedEvents(posts, reposts, quotes) {
+        // すべての関連投稿を結合して時間でソート
+        const allRelatedEvents = [...posts, ...reposts, ...quotes];
+        allRelatedEvents.sort((a, b) => b.created_at - a.created_at);
         relatedEventsList.innerHTML = '';
         
-        relatedEvents.forEach(event => {
+        allRelatedEvents.forEach(event => {
             const profile = userProfiles[event.pubkey] || { name: 'Unknown', picture: 'https://via.placeholder.com/128' };
             const npub = window.NostrTools.nip19.npubEncode(event.pubkey);
             const date = new Date(event.created_at * 1000).toLocaleString();
-            
+
+            let postContentHtml = '';
+            let postTypeLabel = '';
+
+            switch (event.kind) {
+                case 1:
+                    postTypeLabel = 'リプライ';
+                    postContentHtml = `<div class="post-content">${formatPostContent(event.content, event.tags, event.pubkey)}</div>`;
+                    break;
+                case 6:
+                    postTypeLabel = 'リポスト';
+                    const repostUsers = reposts.filter(e => e.pubkey === event.pubkey);
+                    const firstUser = userProfiles[event.pubkey] || { name: 'Unknown' };
+                    const othersCount = repostUsers.length - 1;
+                    const repostText = othersCount > 0 
+                        ? `${escapeHtml(firstUser.name)}さんほか${othersCount}名がリポストしました`
+                        : `${escapeHtml(firstUser.name)}さんがリポストしました`;
+                    postContentHtml = `<div class="post-content">${repostText}</div>`;
+                    break;
+                case 16:
+                    postTypeLabel = '引用';
+                    postContentHtml = `<div class="post-content">${formatPostContent(event.content, event.tags, event.pubkey)}</div>`;
+                    break;
+            }
+
             const html = `
                 <div class="related-post-card">
                     <div class="profile">
@@ -248,9 +279,9 @@
                     </div>
                     <div class="post-info">
                         <span>${date}</span>
-                        <span>${event.kind === 6 ? 'リポスト' : '引用'}</span>
+                        <span>${postTypeLabel}</span>
                     </div>
-                    <div class="post-content">${formatPostContent(event.content, event.tags, event.pubkey)}</div>
+                    ${postContentHtml}
                 </div>
             `;
             relatedEventsList.innerHTML += html;
