@@ -1,1 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>tweets recap</title>
+<style> * { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; padding: 0.5rem; line-height: 1.3; background-color: #f7f7f7; color: #666; font-size: 0.9rem; } .container { max-width: 600px; margin: 0 auto; padding: 0.5rem; border-radius: 4px; background-color: #f7f7f7; } @media (max-width: 767px) { .container { max-width: 100%; padding: 0.5rem; margin: 0; } } .header-section { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #ddd; } .header-buttons { display: flex; gap: 0.5rem; } .header-buttons button, .container button { border: none; font-size: 0.8rem; padding: 0.5rem 0.8rem; border-radius: 999px; font-weight: bold; cursor: pointer; background-color: #ffb366; color: #fff; transition: background-color 0.3s ease, color 0.3s ease; } .header-buttons button:hover, .container button:hover { background-color: #ffa347; } #main-event { padding: 1rem 0; border-bottom: 1px dashed #ddd; } .profile { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; } .profile-image { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; } .profile-name { font-weight: bold; font-size: 1rem; color: #444; } .profile-nip05, .profile-npub { font-size: 0.8rem; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .post-info { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #999; margin-top: 0.25rem; } .post-content { margin-top: 0.5rem; line-height: 1.5; word-wrap: break-word; overflow-wrap: break-word; } .post-content img { max-width: 100%; height: auto; display: block; margin-top: 0.5rem; } .custom-emoji { height: 1.2rem; vertical-align: middle; display: inline-block; } .nostr-link { color: #66b3ff; text-decoration: none; } .nostr-link:hover { text-decoration: underline; } .section-header { margin: 1rem 0 0.5rem; font-size: 1rem; color: #444; font-weight: bold; } .reactions-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; } .reaction-group { display: flex; align-items: center; gap: 0.2rem; background-color: #eee; border-radius: 999px; padding: 0.2rem 0.5rem; font-size: 0.8rem; } .reaction-emoji { font-size: 1rem; } .reaction-avatars { display: flex; flex-direction: row-reverse; } .reaction-avatar { width: 1.2rem; height: 1.2rem; border-radius: 50%; object-fit: cover; border: 1px solid #fff; margin-left: -0.5rem; } .related-posts { margin-top: 1rem; } .related-post-card { background-color: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; margin-bottom: 0.5rem; } .related-post-card .profile-image { width: 1.5rem; height: 1.5rem; } .related-post-card .profile-name, .related-post-card .profile-npub { font-size: 0.8rem; } .related-post-card .post-content { font-size: 0.8rem; margin-top: 0.25rem; } #status { margin-top: 0.5rem; font-weight: bold; color: #ff99cc; text-align: center; } .footer-section { text-align: center; padding: 1rem 0; } </style>
+</head>
+<body>
+<div id="header-placeholder"></div>
+ <div class="container">
+ <div class="header-section">
+ <button onclick="goBack()">もどる</button>
+ <button onclick="copyUrl()">URLコピー</button>
+ </div> 
+ <div id="main-event">
+ </div>
+ <p id="status"></p>
+ <div id="reactions-section" style="display: none;">
+ <h2 class="section-header">リアクション</h2>
+ <div id="reactions-list" class="reactions-list"></div>
+ </div> 
+ <div id="related-events-section" style="display: none;">
+ <h2 class="section-header">関連イベント</h2>
+ <div id="related-events-list" class="related-posts"></div>
+ </div>
+ <div class="footer-section">
+ <button onclick="goBack()">もどる</button>
+ </div>
+ </div>
+ <script src="https://unpkg.com/nostr-tools@1.17.0/lib/nostr.bundle.js"></script>
+ <script>// URLパラメータの取得
+const urlParams = new URLSearchParams(window.location.search);
+const nevent = urlParams.get('nevent');
 
+// DOMエレメントの取得
+const mainEventContainer = document.getElementById('main-event');
+const statusElement = document.getElementById('status');
+const reactionsSection = document.getElementById('reactions-section');
+const reactionsList = document.getElementById('reactions-list');
+const relatedEventsSection = document.getElementById('related-events-section');
+const relatedEventsList = document.getElementById('related-events-list');
+
+// リレーとnostr-toolsの初期設定
+const RELAY_URL = 'wss://relay.nostr.band';
+const subId = 'tweetsrecap-' + Date.now();
+const pool = new window.NostrTools.SimplePool();
+const userProfiles = {}; // pubkey -> profile cache
+
+/**
+ * ページにイベント情報を表示するメイン関数
+ */
+async function renderEventDetail() {
+ if (!nevent) {
+ showStatus('エラー: neventパラメータがありません。');
+ return;
+ }
+
+ try {
+ const decoded = window.NostrTools.nip19.decode(nevent);
+ if (decoded.type !== 'nevent') {
+ showStatus('エラー: 無効なnevent形式です。');
+ return;
+ }
+ const eventId = decoded.data.id;
+ const authorPubkey = decoded.data.author;
+ 
+ showStatus('イベントデータを取得中...');
+
+ // メインイベント、関連イベント、リアクションを同時に取得
+ const mainEventPromise = pool.get([RELAY_URL], {
+ ids: [eventId],
+ kinds: [1]
+ });
+
+ const relatedEventsPromise = pool.list([RELAY_URL], [{
+ '#e': [eventId],
+ kinds: [1, 6, 7, 16]
+ }]);
+
+ const [mainEvent, relatedEvents] = await Promise.all([mainEventPromise, relatedEventsPromise]);
+
+ if (!mainEvent) {
+ showStatus('イベントが見つかりませんでした');
+ return;
+ }
+
+ // プロフィール情報をキャッシュ
+ const pubkeysToFetch = new Set();
+ pubkeysToFetch.add(mainEvent.pubkey);
+ relatedEvents.forEach(e => pubkeysToFetch.add(e.pubkey));
+ await fetchProfiles(Array.from(pubkeysToFetch));
+
+ // メイン投稿のレンダリング
+ renderMainEvent(mainEvent);
+
+ // リアクションと関連イベントを分類してレンダリング
+ const reactions = relatedEvents.filter(e => e.kind === 7);
+ const repostsAndQuotes = relatedEvents.filter(e => e.kind === 6 || e.kind === 16);
+
+ if (reactions.length > 0) {
+ renderReactions(reactions);
+ }
+ if (repostsAndQuotes.length > 0) {
+ renderRelatedEvents(repostsAndQuotes);
+ }
+ 
+ showStatus(''); // 正常終了
+ } catch (err) {
+ console.error('Failed to fetch event:', err);
+ showStatus('イベントの取得中にエラーが発生しました。');
+ }
+}
+
+/**
+ * プロフィール情報を取得し、キャッシュに保存
+ * @param {string[]} pubkeys - 取得するpubkeyの配列
+ */
+async function fetchProfiles(pubkeys) {
+ if (pubkeys.length === 0) return;
+ const profiles = await pool.list([RELAY_URL], [{
+ kinds: [0],
+ authors: pubkeys
+ }]);
+ profiles.forEach(p => {
+ try {
+ const content = JSON.parse(p.content);
+ userProfiles[p.pubkey] = content;
+ } catch (e) {
+ console.error('Failed to parse profile JSON for pubkey:', p.pubkey);
+ }
+ });
+}
+
+/**
+ * メイン投稿の表示
+ * @param {object} event - kind:1 イベントオブジェクト
+ */
+function renderMainEvent(event) {
+ const profile = userProfiles[event.pubkey] || { name: 'Unknown', picture: 'https://via.placeholder.com/128' };
+ const npub = window.NostrTools.nip19.npubEncode(event.pubkey);
+ const date = new Date(event.created_at * 1000).toLocaleString();
+ const client = event.tags.find(t => t[0] === 'client')?.[1] || '';
+
+ const html = `
+ <div class="profile">
+ <img src="${profile.picture}" class="profile-image" alt="User profile image">
+ <div>
+ <span class="profile-name">${escapeHtml(profile.name)}</span>
+ <span class="profile-nip05">${profile.nip05 ? escapeHtml(profile.nip05) : npub.substring(0, 8) + '...' + npub.slice(-4)}</span>
+ </div>
+ </div>
+ <div class="post-content">${formatPostContent(event.content, event.tags, event.pubkey)}</div>
+ <div class="post-info">
+ <span>${date}</span>
+ ${client ? `<span>via ${escapeHtml(client)}</span>` : ''}
+ </div>
+ `;
+ mainEventContainer.innerHTML = html;
+}
+
+/**
+ * リアクションをグループ化して表示
+ * @param {object[]} reactions - kind:7 イベントの配列
+ */
+function renderReactions(reactions) {
+ const reactionGroups = new Map(); // emoji -> { count: number, pubkeys: Set }
+ 
+ reactions.forEach(reaction => {
+ const emoji = reaction.content.trim();
+ if (!reactionGroups.has(emoji)) {
+ reactionGroups.set(emoji, { count: 0, pubkeys: new Set() });
+ }
+ const group = reactionGroups.get(emoji);
+ group.count++;
+ group.pubkeys.add(reaction.pubkey);
+ });
+
+ reactionsList.innerHTML = '';
+ 
+ for (const [emoji, group] of reactionGroups.entries()) {
+ const avatarsHtml = Array.from(group.pubkeys).map(pubkey => {
+ const profile = userProfiles[pubkey] || { picture: 'https://via.placeholder.com/128' };
+ return `<img src="${profile.picture}" class="reaction-avatar" alt="reaction user avatar">`;
+ }).join('');
+ 
+ const groupHtml = `
+ <div class="reaction-group">
+ <span class="reaction-emoji">${emoji}</span>
+ <div class="reaction-avatars">${avatarsHtml}</div>
+ </div>
+ `;
+ reactionsList.innerHTML += groupHtml;
+ }
+
+ reactionsSection.style.display = 'block';
+}
+
+/**
+ * 関連イベント（リポスト・引用）を表示
+ * @param {object[]} relatedEvents - kind:6, 16 イベントの配列
+ */
+function renderRelatedEvents(relatedEvents) {
+ relatedEvents.sort((a, b) => b.created_at - a.created_at);
+ relatedEventsList.innerHTML = '';
+ 
+ relatedEvents.forEach(event => {
+ const profile = userProfiles[event.pubkey] || { name: 'Unknown', picture: 'https://via.placeholder.com/128' };
+ const npub = window.NostrTools.nip19.npubEncode(event.pubkey);
+ const date = new Date(event.created_at * 1000).toLocaleString();
+ 
+ const html = `
+ <div class="related-post-card">
+ <div class="profile">
+ <img src="${profile.picture}" class="profile-image" alt="User avatar">
+ <div>
+ <span class="profile-name">${escapeHtml(profile.name)}</span>
+ <span class="profile-npub">${npub.substring(0, 8) + '...' + npub.slice(-4)}</span>
+ </div>
+ </div>
+ <div class="post-info">
+ <span>${date}</span>
+ <span>${event.kind === 6 ? 'リポスト' : '引用'}</span>
+ </div>
+ <div class="post-content">${formatPostContent(event.content, event.tags, event.pubkey)}</div>
+ </div>
+ `;
+ relatedEventsList.innerHTML += html;
+ });
+
+ relatedEventsSection.style.display = 'block';
+}
+
+/**
+ * 投稿本文のフォーマット
+ * - 改行を<br>に変換
+ * - URLを自動リンク化
+ * - nostr:リンクを変換
+ * - カスタム絵文字を縮小
+ * @param {string} content - 投稿本文
+ * @param {array} tags - イベントタグ
+ * @param {string} pubkey - 投稿者のpubkey
+ */
+function formatPostContent(content, tags, pubkey) {
+ let formattedContent = escapeHtml(content);
+ 
+ // URLの自動リンク化
+ formattedContent = formattedContent.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+ return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+ });
+
+ // nostr:リンクの変換
+ formattedContent = formattedContent.replace(/nostr:(n(?:pub|event|note|profile|relay)1\S+)/g, (match, nip19) => {
+ const link = createNostrLink(nip19);
+ return `<a href="${link}" class="nostr-link">${match}</a>`;
+ });
+
+ // カスタム絵文字の処理 (NIP-30)
+ const customEmojis = tags.filter(t => t[0] === 'emoji');
+ customEmojis.forEach(([_, shortcode, url]) => {
+ const regex = new RegExp(`:${shortcode}:`, 'g');
+ formattedContent = formattedContent.replace(regex, `<img src="${url}" alt="${shortcode}" class="custom-emoji">`);
+ });
+
+ // 画像URLのサムネイル表示 (NIP-27)
+ const images = content.match(/\bhttps?:\/\/\S+\.(?:png|jpe?g|gif|webp|svg|heic|avif)\b/gi);
+ if (images) {
+ images.forEach(imgUrl => {
+ const imgHtml = `<img src="${imgUrl}" alt="post image">`;
+ formattedContent += imgHtml;
+ });
+ }
+
+ return formattedContent.replace(/\n/g, '<br>');
+}
+
+/**
+ * Nostrリンクを自身のビューアへのURLに変換
+ * @param {string} nip19 - nostr:リンクの文字列
+ * @returns {string} 変換後のURL
+ */
+function createNostrLink(nip19) {
+ try {
+ const decoded = window.NostrTools.nip19.decode(nip19);
+ switch (decoded.type) {
+ case 'note':
+ case 'nevent':
+ return `/tweetsrecap/tweet?nevent=${nip19}`;
+ case 'npub':
+ case 'nprofile':
+ // 今回は詳細ページがないので、トップページにpubkeyを渡す例
+ const pubkey = decoded.data.id || decoded.data;
+ const npub = window.NostrTools.nip19.npubEncode(pubkey);
+ return `/tweetsrecap/?npub=${npub}`;
+ default:
+ return '#';
+ }
+ } catch (e) {
+ console.error('Failed to decode nostr link:', e);
+ return '#';
+ }
+}
+
+/**
+ * ステータスメッセージの表示
+ * @param {string} message - 表示するメッセージ
+ */
+function showStatus(message) {
+ statusElement.textContent = message;
+ statusElement.style.display = message ? 'block' : 'none';
+}
+
+/**
+ * HTMLエスケープ処理
+ * @param {string} str - エスケープする文字列
+ * @returns {string} エスケープ後の文字列
+ */
+function escapeHtml(str) {
+ if (!str) return '';
+ return str.replace(/[&<>"']/g, function(match) {
+ const escape = {
+ '&': '&amp;',
+ '<': '&lt;',
+ '>': '&gt;',
+ '"': '&quot;',
+ "'": '&#39;'
+ };
+ return escape[match];
+ });
+}
+
+/**
+ * 「もどる」ボタンの挙動
+ */
+function goBack() {
+ if (window.history.length > 1) {
+ window.history.back();
+ } else {
+ window.location.href = '/tweetsrecap/';
+ }
+}
+
+/**
+ * URLコピーボタンの挙動
+ */
+function copyUrl() {
+ navigator.clipboard.writeText(window.location.href)
+ .then(() => {
+ alert('URLがコピーされました！');
+ })
+ .catch(err => {
+ console.error('URLのコピーに失敗しました:', err);
+ alert('URLのコピーに失敗しました。');
+ });
+}
+
+// ページロード時に処理を開始
+window.onload = renderEventDetail;
+</script>
+<script src="https://ompomz.github.io/header/loadHeader.js"></script>
+</body>
+</html>
