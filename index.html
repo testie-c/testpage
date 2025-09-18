@@ -221,7 +221,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 
     function renderMainEvent(event) {
         const date = new Date(event.created_at * 1000).toLocaleString();
-        const client = event.tags.find(t => t[0] === 'client') ? .[1] || '';
+        const client = event.tags.find(t => t[0] === 'client')?.[1] || '';
         const html = `
             ${createProfileHtml(event.pubkey)}
             <div class="post-content">${formatPostContent(event.content, event.tags)}</div>
