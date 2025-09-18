@@ -46,35 +46,52 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 </head>
 <body>
 <div id="header-placeholder"></div>
- <div class="container">
- <div class="header-section">
- <button onclick="goBack()">もどる</button>
- <button onclick="copyUrl()">シェア</button>
- </div> 
- <div id="main-event">
- </div>
- <p id="status"></p>
- <div id="reactions-section" style="display: none;">
- <h2 class="section-header"></h2>
- <div id="reactions-list" class="reactions-list"></div>
- </div> 
- <div id="related-events-section" style="display: none;">
- <h2 class="section-header"></h2>
- <div id="related-events-list" class="related-posts"></div>
- </div>
- <div class="footer-section">
- <button onclick="goBack()">もどる</button>
- </div>
- </div>
+<div class="container">
+<div class="header-section">
+<button onclick="goBack()">もどる</button>
+<button onclick="copyUrl()">シェア</button>
+</div>
+<div id="main-event">
+</div>
+<p id="status"></p>
+<div id="reactions-section" style="display: none;">
+<h2 class="section-header"></h2>
+<div id="reactions-list" class="reactions-list"></div>
+</div>
+<div id="related-events-section" style="display: none;">
+<h2 class="section-header"></h2>
+<div id="related-events-list" class="related-posts"></div>
+</div>
+<div class="footer-section">
+<button onclick="goBack()">もどる</button>
+</div>
+</div>
 <script src="https://unpkg.com/nostr-tools@1.17.0/lib/nostr.bundle.js"></script>
 <script>
+function goBack() {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.href = 'https://ompomz.github.io/flowgazer/index2';
+  }
+}
+function copyUrl() {
+  navigator.clipboard.writeText(window.location.href)
+    .then(() => {
+      alert('URLがコピーされました！');
+    })
+    .catch(err => {
+      console.error('URLのコピーに失敗しました:', err);
+      alert('URLのコピーに失敗しました。');
+    });
+}
+
 const mainEventContainer = document.getElementById('main-event');
 const statusElement = document.getElementById('status');
 const reactionsSection = document.getElementById('reactions-section');
 const reactionsList = document.getElementById('reactions-list');
 const relatedEventsSection = document.getElementById('related-events-section');
 const relatedEventsList = document.getElementById('related-events-list');
-
 const FALLBACK_RELAYS = [
   'wss://relay.nostr.band',
   'wss://nos.lol',
@@ -144,18 +161,15 @@ function formatPostContent(content, tags) {
     }
     return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
   });
-
   formattedContent = formattedContent.replace(/nostr:(n(?:pub|event|note|profile|relay|addr)1\S+)/g, (match, nip19) => {
     const link = createNostrLink(nip19);
     return `<a href="${link}" class="nostr-link">${match}</a>`;
   });
-
   const customEmojis = tags.filter(t => t[0] === 'emoji');
   customEmojis.forEach(([_, shortcode, url]) => {
     const regex = new RegExp(`:${shortcode}:`, 'g');
     formattedContent = formattedContent.replace(regex, `<img src="${url}" alt="${shortcode}" class="custom-emoji">`);
   });
-
   return formattedContent.replace(/\n/g, '<br>');
 }
 
@@ -163,7 +177,6 @@ async function fetchProfiles(pubkeys) {
   if (pubkeys.length === 0) return;
   const pubkeysToFetch = pubkeys.filter(pubkey => !userProfiles[pubkey]);
   if (pubkeysToFetch.length === 0) return;
-
   // until: 現在 を追加
   const until = Math.floor(Date.now() / 1000);
   const profiles = await pool.list(FALLBACK_RELAYS, [{
@@ -188,15 +201,14 @@ function createProfileHtml(pubkey, isLink = true) {
   };
   const npub = window.NostrTools.nip19.npubEncode(pubkey);
   const profileContentHtml = `
-  <div class="profile">
-  <img src="${profile.picture}" class="profile-image" alt="User profile image">
-  <div>
-  <span class="profile-name">${escapeHtml(profile.name)}</span>
-  <span class="profile-nip05">${profile.nip05 ? escapeHtml(profile.nip05) : npub.substring(0, 8) + '...' + npub.slice(-4)}</span>
-  </div>
-  </div>
+    <div class="profile">
+      <img src="${profile.picture}" class="profile-image" alt="User profile image">
+      <div>
+        <span class="profile-name">${escapeHtml(profile.name)}</span>
+        <span class="profile-nip05">${profile.nip05 ? escapeHtml(profile.nip05) : npub.substring(0, 8) + '...' + npub.slice(-4)}</span>
+      </div>
+    </div>
   `;
-
   if (isLink) {
     const profileUrl = `?id=${npub}`;
     return `<a href="${profileUrl}" class="profile-link">${profileContentHtml}</a>`;
@@ -205,35 +217,16 @@ function createProfileHtml(pubkey, isLink = true) {
   }
 }
 
-function goBack() {
-  if (window.history.length > 1) {
-    window.history.back();
-  } else {
-    window.location.href = 'https://ompomz.github.io/flowgazer/index2';
-  }
-}
-
-function copyUrl() {
-  navigator.clipboard.writeText(window.location.href)
-    .then(() => {
-      alert('URLがコピーされました！');
-    })
-    .catch(err => {
-      console.error('URLのコピーに失敗しました:', err);
-      alert('URLのコピーに失敗しました。');
-    });
-}
-
 function renderMainEvent(event) {
   const date = new Date(event.created_at * 1000).toLocaleString();
   const client = event.tags.find(t => t[0] === 'client') ? .[1] || '';
   const html = `
-  ${createProfileHtml(event.pubkey)}
-  <div class="post-content">${formatPostContent(event.content, event.tags)}</div>
-  <div class="post-info">
-  <span>${date}</span>
-  ${client ? `<span>via ${escapeHtml(client)}</span>` : ''}
-  </div>
+    ${createProfileHtml(event.pubkey)}
+    <div class="post-content">${formatPostContent(event.content, event.tags)}</div>
+    <div class="post-info">
+      <span>${date}</span>
+      ${client ? `<span>via ${escapeHtml(client)}</span>` : ''}
+    </div>
   `;
   mainEventContainer.innerHTML = html;
 }
@@ -262,11 +255,12 @@ function renderReactions(reactions) {
       const profileUrl = `?id=${npub}`;
       return `<a href="${profileUrl}"><img src="${profile.picture}" class="reaction-avatar" alt="reaction user avatar"></a>`;
     }).join('');
+    const displayedEmoji = emoji === '+' ? '⭐' : emoji;
     const groupHtml = `
-    <div class="reaction-group">
-    <span class="reaction-emoji">${emoji}</span>
-    <div class="reaction-avatars">${avatarsHtml}</div>
-    </div>
+      <div class="reaction-group">
+        <span class="reaction-emoji">${displayedEmoji}</span>
+        <div class="reaction-avatars">${avatarsHtml}</div>
+      </div>
     `;
     reactionsList.innerHTML += groupHtml;
   }
@@ -299,14 +293,14 @@ function renderRelatedEvents(posts, reposts, quotes) {
         break;
     }
     const html = `
-    <div class="related-post-card">
-    ${createProfileHtml(event.pubkey)}
-    <div class="post-info">
-    <span>${date}</span>
-    <span>${postTypeLabel}</span>
-    </div>
-    ${postContentHtml}
-    </div>
+      <div class="related-post-card">
+        ${createProfileHtml(event.pubkey)}
+        <div class="post-info">
+          <span>${date}</span>
+          <span>${postTypeLabel}</span>
+        </div>
+        ${postContentHtml}
+      </div>
     `;
     relatedEventsList.innerHTML += html;
   });
@@ -321,7 +315,6 @@ async function renderEventDetail(nostrId) {
     const until = Math.floor(Date.now() / 1000);
     let eventId;
     let filters = {};
-
     switch (decoded.type) {
       case 'note':
       case 'nevent':
@@ -342,7 +335,6 @@ async function renderEventDetail(nostrId) {
         showStatus('エラー: 無効なID形式です。');
         return;
     }
-
     console.log(`ℹ️ ID ${nostrId} の取得を開始します。`);
     const mainEventPromise = pool.get(relays, { ...filters,
       until: until,
@@ -353,14 +345,11 @@ async function renderEventDetail(nostrId) {
       kinds: [1, 6, 7, 16],
       until: until
     });
-
     const [mainEvent, relatedEvents] = await Promise.all([mainEventPromise, relatedEventsPromise]);
-
     if (!mainEvent) {
       showStatus('イベントが見つかりませんでした');
       return;
     }
-
     const pubkeysToFetch = new Set();
     pubkeysToFetch.add(mainEvent.pubkey);
     relatedEvents.forEach(e => pubkeysToFetch.add(e.pubkey));
@@ -392,31 +381,28 @@ async function renderProfileDetail(nostrId) {
       showStatus('エラー: 無効なnpubまたはnprofile形式です。');
       return;
     }
-
     const relays = (decoded.data.relays && decoded.data.relays.length > 0) ? decoded.data.relays : FALLBACK_RELAYS;
     const pubkey = decoded.data.id || decoded.data;
     const until = Math.floor(Date.now() / 1000);
-
     const profileEvent = await pool.get(relays, {
       kinds: [0],
       authors: [pubkey],
       until: until,
       limit: 1
     });
-
     if (!profileEvent) {
       showStatus('プロフィールが見つかりませんでした。');
       return;
     }
     const profile = JSON.parse(profileEvent.content);
     const html = `
-    <div class="profile-card">
-    <img src="${profile.picture}" alt="Profile Picture">
-    <h2>${escapeHtml(profile.name)}</h2>
-    <p class="npub">${window.NostrTools.nip19.npubEncode(pubkey)}</p>
-    <p class="about">${escapeHtml(profile.about || '')}</p>
-    <p class="nip05">${profile.nip05 ? escapeHtml(profile.nip05) : 'NIP-05未設定'}</p>
-    </div>
+      <div class="profile-card">
+        <img src="${profile.picture}" alt="Profile Picture">
+        <h2>${escapeHtml(profile.name)}</h2>
+        <p class="npub">${window.NostrTools.nip19.npubEncode(pubkey)}</p>
+        <p class="about">${escapeHtml(profile.about || '')}</p>
+        <p class="nip05">${profile.nip05 ? escapeHtml(profile.nip05) : 'NIP-05未設定'}</p>
+      </div>
     `;
     mainEventContainer.innerHTML = html;
     showStatus('');
@@ -430,13 +416,13 @@ async function renderProfileDetail(nostrId) {
 
 function renderInputForm() {
   mainEventContainer.innerHTML = `
-  <div class="input-form-container">
-  <p class="form-title">イベントまたはユーザーのNostr IDを入力してください</p>
-  <form id="nostr-form" class="nostr-form">
-  <input type="text" id="nostr-id-input" placeholder="nevent1..., npub1..." required class="form-input">
-  <button type="submit" class="form-button">表示</button>
-  </form>
-  </div>
+    <div class="input-form-container">
+      <p class="form-title">イベントまたはユーザーのNostr IDを入力してください</p>
+      <form id="nostr-form" class="nostr-form">
+        <input type="text" id="nostr-id-input" placeholder="nevent1..., npub1..." required class="form-input">
+        <button type="submit" class="form-button">表示</button>
+      </form>
+    </div>
   `;
   const form = document.getElementById('nostr-form');
   form.addEventListener('submit', (e) => {
@@ -455,7 +441,6 @@ function renderInputForm() {
 window.onload = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
-
   if (id) {
     if (id.startsWith('npub1') || id.startsWith('nprofile1')) {
       renderProfileDetail(id);
