@@ -413,8 +413,7 @@ async function fetchProfiles(pubkeys) {
  const profiles = await pool.list(FALLBACK_RELAYS, [{
  kinds: [0],
  authors: pubkeysToFetch,
- until: until,
- limit: 1
+ until: until
  }]);
  console.log(`✅ ${profiles.length}件のプロフィールイベントを取得しました。`);
  profiles.forEach(p => {
