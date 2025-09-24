@@ -1,1 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>shitsumonbako</title>
+  <style></style>
+</head>
+<body>
+  <h1>something massage</h1>
+  <p>for want anonimas</p>
+  <textarea id="message" placeholder="toukounaiyou"></textarea>
+  <button onclick="send()">send</button>
+  <div id="status"></div>
+  <script type="module">
+    import { generatePrivateKey, getPublicKey, getEventHash, signEvent } from "https://esm.sh/nostr-tools";
 
+    const RELAY_URL = "wss://relay.nostr.band";
+    const KIND40_ID = "53197aaf441e5685655217a891cb254839d064425ee79708b097e99d1ccc0c34";
+
+    async function send() {
+      const msg = document.getElementById("message").value.trim();
+      if (!msg) return alert("メッセージを入力してください");
+
+      const sk = generatePrivateKey();
+      const pk = getPublicKey(sk);
+      const now = Math.floor(Date.now() / 1000);
+
+      const event = {
+        kind: 42,
+        created_at: now,
+        pubkey: pk,
+        content: msg,
+        tags: [
+          ["e", KIND40_ID, RELAY_URL, "root"]
+        ]
+      };
+
+      event.id = getEventHash(event);
+      event.sig = await signEvent(event, sk);
+
+      const socket = new WebSocket(RELAY_URL);
+      socket.onopen = () => {
+        socket.send(JSON.stringify(["EVENT", event]));
+        document.getElementById("status").textContent = "送信しました！";
+        document.getElementById("message").value = "";
+        socket.close();
+      };
+      socket.onerror = () => {
+        document.getElementById("status").textContent = "送信に失敗しました…";
+      };
+    }
+  </script>
+</body>
+</html>
