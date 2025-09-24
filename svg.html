@@ -1,1 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>hex pubkey picker</title>
+ <style>
+ * {margin:0;padding:0;box-sizing:border-box;}
+ body {font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";padding:16px;line-height:1.3;font-weight:normal;background-color:#f7f7f7;color:#333;}
+ h1 {font-size:1.25rem;color:#555;margin-bottom:0rem;}
+ h2 {font-size:1rem;color:#555;margin:6px 0px 6px 0px;}
+ p {font-size:.9rem;color:#666;}
+ a {color:#007bff;text-decoration:none;}
+ a:hover {text-decoration:underline;}
+ section {max-width:600px;margin-right:auto;padding:0rem;}
+@media (max-width: 767px) { section { max-width: 100%; padding: 0px; margin: 0; }}
+ input[type="text"], textarea {width: calc(100% - 100px); padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;transition:border-color .2s;}
+ input[type="text"]:focus, textarea:focus {outline:none;border-color:#4c51bf;}
+ textarea#pubkey-textarea {resize:vertical;}
+ button {padding:4px 12px;background-color:#4c51bf;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:bold;transition:background-color .2s;white-space:nowrap;}
+ button:hover {background-color:#667eea;}
+ button[onclick="getFollowList()"], button[onclick="getProfiles()"] {background-color:#ffb366;}
+ button[onclick="getFollowList()"]:hover, button[onclick="getProfiles()"]:hover {background-color:#ffa347;}
+ button[onclick="checkAll(true)"], button[onclick="checkAll(false)"] {background-color:#66b3ff;}
+ button[onclick="checkAll(true)"]:hover, button[onclick="checkAll(false)"]:hover {background-color:#4da6ff;}
+ button[onclick="extractSelected()"] {background-color:#ff99cc;}
+ button[onclick="extractSelected()"]:hover {background-color:#ff66b2;}
+ button[onclick="copyExtractedFollows()"], button[onclick="copyHexes()"] {background-color:#ffd700;}
+ button[onclick="copyExtractedFollows()"]:hover, button[onclick="copyHexes()"]:hover {background-color:#ffc400;}
+ button[onclick="pasteFromExtractedFollows()"], button[onclick="clearPubkeyTextarea()"] {background-color:#f7f7f7;color:#ff99cc;padding:0;margin:0px 0px 7px 0px;}
+ button[onclick="pasteFromExtractedFollows()"]:hover, button[onclick="clearPubkeyTextarea()"]:hover {background-color:#f7f7f7;color:#ff66b2;padding:0;margin:0px 0px 7px 0px;}
+ hr {max-width:600px;border:none;border-top:1px dashed #ccc;margin:8px 0px 4px 0px;}
+ .input-group {display:flex;align-items:center;gap:8px;justify-content:flex-start;padding:4px 0px 4px 0px;}
+ .kind0-group {display:flex;align-items:flex-end;gap:8px;justify-content:flex-start;padding:0;}
+ table {width:100%;border-collapse:collapse;background-color:#fff;margin:4px 0px 4px 0px;}
+ th,td {padding:5px;border:1px solid #e2e8f0;font-weight:normal;}
+</style>
+</head>
+<body>
+<div id="header-placeholder"></div>
+<h1>hex pubkey picker</h1>
+<section>
+    <h2>kind:0（プロフィール取得）</h2>
+    <div class="input-group">
+        <textarea id="pubkey-textarea" rows="3" cols="40" placeholder="公開鍵（hex1...,hex2...,...）"></textarea>
+        <button id="get-profiles-btn">取得</button>
+    </div>
+    <hr>
+    <div class="input-group">
+        <button id="check-all-btn">全部チェック</button>
+        <button id="uncheck-all-btn">全部はずす</button>
+        <button id="extract-selected-btn">抽出</button>
+    </div>
+    <div class="input-group">
+        <textarea id="extracted-hexes" rows="1" cols="40" placeholder="抽出後の公開鍵一覧"></textarea>
+        <button id="copy-hexes-btn">コピー</button>
+    </div>
+    <table border="1" id="profile-table">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="master-checkbox"></th>
+                <th>name</th>
+                <th>hex</th>
+                <th>npub</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <div class="input-group">
+        <textarea id="name-column" rows="3" cols="40" placeholder="name列"></textarea>
+        <button id="copy-name-btn">nameコピー</button>
+    </div>
+    <div class="input-group">
+        <textarea id="hex-column" rows="3" cols="40" placeholder="hex列"></textarea>
+        <button id="copy-hex-btn">hexコピー</button>
+    </div>
+    <div class="input-group">
+        <textarea id="npub-column" rows="3" cols="40" placeholder="npub列"></textarea>
+        <button id="copy-npub-btn">npubコピー</button>
+    </div>
+</section>
+<script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.1.2/lib/nostr.bundle.min.js"></script>
+<script>
+    const relays = [
+        "wss://nos.lol",
+        "wss://relay-jp.nostr.wirednet.jp",
+        "wss://relay.damus.io"
+    ];
+    const pool = nostrTools.simplePool();
 
+    function checkAll(flag) {
+        document.querySelectorAll("#profile-table tbody input[type='checkbox']").forEach(cb => cb.checked = flag);
+        document.getElementById('master-checkbox').checked = flag;
+    }
+
+    function extractSelected() {
+        const selected = Array.from(document.querySelectorAll("#profile-table input[type='checkbox']:checked"))
+            .map(cb => cb.getAttribute("data-hex"));
+        document.getElementById("extracted-hexes").value = selected.join(",");
+    }
+
+    function copyText(id) {
+        const el = document.getElementById(id);
+        el.select();
+        document.execCommand("copy");
+        alert("コピーしました！");
+    }
+
+    async function fetchAndDisplayProfiles() {
+        const textarea = document.getElementById("pubkey-textarea");
+        const hexes = textarea.value.split(",").map(h => h.trim()).filter(h => h.length === 64);
+        const tableBody = document.querySelector("#profile-table tbody");
+        tableBody.innerHTML = "";
+        
+        const columnData = {
+            name: [],
+            hex: [],
+            npub: []
+        };
+        const uniqueHexes = [...new Set(hexes)];
+        
+        if (uniqueHexes.length === 0) return;
+
+        try {
+            const sub = pool.subscribe(relays, [{
+                kinds: [0],
+                authors: uniqueHexes,
+                limit: uniqueHexes.length
+            }], (event) => {
+                const profile = JSON.parse(event.content);
+                const name = profile.name || "(no name)";
+                const npub = nostrTools.nip19.npubEncode(event.pubkey);
+                
+                // データを蓄積
+                columnData.name.push(name);
+                columnData.hex.push(event.pubkey);
+                columnData.npub.push(npub);
+            });
+            
+            // イベント処理を待機
+            await new Promise(resolve => sub.on("eose", () => {
+                sub.close();
+                resolve();
+            }));
+
+            // 収集したデータを元にDOMを更新
+            const fragment = document.createDocumentFragment();
+            columnData.name.forEach((name, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td><input type="checkbox" data-hex="${columnData.hex[index]}"></td>
+                    <td>${name}</td>
+                    <td>${columnData.hex[index]}</td>
+                    <td>${columnData.npub[index]}</td>
+                `;
+                fragment.appendChild(row);
+            });
+            tableBody.appendChild(fragment);
+
+            document.getElementById("name-column").value = columnData.name.join("\n");
+            document.getElementById("hex-column").value = columnData.hex.join("\n");
+            document.getElementById("npub-column").value = columnData.npub.join("\n");
+
+        } catch (e) {
+            console.error("Error fetching profiles:", e);
+        }
+    }
+
+    // イベントリスナーの設定
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("get-profiles-btn").addEventListener("click", fetchAndDisplayProfiles);
+        document.getElementById("check-all-btn").addEventListener("click", () => checkAll(true));
+        document.getElementById("uncheck-all-btn").addEventListener("click", () => checkAll(false));
+        document.getElementById("extract-selected-btn").addEventListener("click", extractSelected);
+        document.getElementById("copy-hexes-btn").addEventListener("click", () => copyText('extracted-hexes'));
+        document.getElementById("copy-name-btn").addEventListener("click", () => copyText('name-column'));
+        document.getElementById("copy-hex-btn").addEventListener("click", () => copyText('hex-column'));
+        document.getElementById("copy-npub-btn").addEventListener("click", () => copyText('npub-column'));
+        
+        // 全選択チェックボックスの機能を追加
+        const masterCheckbox = document.getElementById('master-checkbox');
+        masterCheckbox.addEventListener('change', () => {
+            checkAll(masterCheckbox.checked);
+        });
+    });
+</script>
+<script src="https://ompomz.github.io/header/loadHeader.js"></script>
+</body>
+</html>
