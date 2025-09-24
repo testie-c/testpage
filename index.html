@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>shitsumonbako</title>
-  <style></style>
+  <style>
+    body { font-family: sans-serif; padding: 2em; background: #f9f9f9; }
+    textarea { width: 100%; height: 100px; margin-bottom: 1em; }
+    button { padding: 0.5em 1em; font-size: 1em; }
+    #status { margin-top: 1em; color: green; }
+  </style>
 </head>
 <body>
   <h1>leave a message</h1>
@@ -11,40 +16,43 @@
   <textarea id="message" placeholder="ｎａｎｄｅｍｏ　ｏｋａｙ"></textarea>
   <button onclick="send()">send</button>
   <div id="status"></div>
-  <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
-<script>
-  async function send() {
-    const msg = document.getElementById("message").value.trim();
-    if (!msg) return alert("メッセージを入力してください");
 
-    const sk = nostrTools.generatePrivateKey();
-    const pk = nostrTools.getPublicKey(sk);
-    const now = Math.floor(Date.now() / 1000);
+  <!-- ✅ 正しいnostr-toolsのUMDバンドル -->
+  <script src="https://unpkg.com/nostr-tools/bundle/nostr.bundle.js"></script>
 
-    const event = {
-      kind: 42,
-      created_at: now,
-      pubkey: pk,
-      content: msg,
-      tags: [
-        ["e", "53197aaf441e5685655217a891cb254839d064425ee79708b097e99d1ccc0c34", "wss://relay.nostr.band", "root"]
-      ]
-    };
+  <script>
+    async function send() {
+      const msg = document.getElementById("message").value.trim();
+      if (!msg) return alert("メッセージを入力してください");
 
-    event.id = nostrTools.getEventHash(event);
-    event.sig = await nostrTools.signEvent(event, sk); // ← ここが重要！
+      const sk = nostrTools.generatePrivateKey();
+      const pk = nostrTools.getPublicKey(sk);
+      const now = Math.floor(Date.now() / 1000);
 
-    const socket = new WebSocket("wss://relay.nostr.band");
-    socket.onopen = () => {
-      socket.send(JSON.stringify(["EVENT", event]));
-      document.getElementById("status").textContent = "送信しました！";
-      document.getElementById("message").value = "";
-      socket.close();
-    };
-    socket.onerror = () => {
-      document.getElementById("status").textContent = "送信に失敗しました…";
-    };
-  }
-</script>
+      const event = {
+        kind: 42,
+        created_at: now,
+        pubkey: pk,
+        content: msg,
+        tags: [
+          ["e", "53197aaf441e5685655217a891cb254839d064425ee79708b097e99d1ccc0c34", "wss://relay.nostr.band", "root"]
+        ]
+      };
+
+      event.id = nostrTools.getEventHash(event);
+      event.sig = await nostrTools.signEvent(event, sk);
+
+      const socket = new WebSocket("wss://relay.nostr.band");
+      socket.onopen = () => {
+        socket.send(JSON.stringify(["EVENT", event]));
+        document.getElementById("status").textContent = "送信しました！";
+        document.getElementById("message").value = "";
+        socket.close();
+      };
+      socket.onerror = () => {
+        document.getElementById("status").textContent = "送信に失敗しました…";
+      };
+    }
+  </script>
 </body>
 </html>
