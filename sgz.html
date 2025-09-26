@@ -58,6 +58,8 @@ a.pubkey-ref:hover { text-decoration: none; }
 </div>
 <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
 <script>
+  const TWEET_RECAP_URL_BASE = "https://ompomz.github.io/tweetsrecap/tweet?id=";
+  
   // === 汎用ヘルパー関数 ===
   function getLanguage() {
     return (window.navigator.language || window.navigator.browserLanguage || window.navigator.userLanguage).substring(0, 2);
@@ -122,7 +124,7 @@ a.pubkey-ref:hover { text-decoration: none; }
   function pubkeyView(pubkey) {
     const npub = window.NostrTools.nip19.npubEncode(pubkey);
     const displayName = getDisplayName(pubkey);
-    const a = externalLink("https://ompomz.github.io/tweetsrecap/tweet?id=" + npub, displayName);
+    const a=externalLink(TWEET_RECAP_URL_BASE + npub, displayName);
     a.classList.add("pubkey-ref");
     if (!pubkeyElements[pubkey]) {
       pubkeyElements[pubkey] = [];
@@ -194,56 +196,56 @@ a.pubkey-ref:hover { text-decoration: none; }
   }
 
   // Kind:7 イベントの表示処理
-  function reactionEventView(nostrEv) {
-    const view = baseEventView();
-    view.id = nostrEv.id;
+  function reactionEventView(nostrEv){
+    const view=baseEventView();
+    view.id=nostrEv.id;
     view.classList.add("event-reaction");
     view.appendChild(metadataView(nostrEv));
-    let reactionContent = nostrEv.content;
-    if (reactionContent === "+") {
-      reactionContent = "☆";
-    } else if (reactionContent === "" || reactionContent === undefined) {
-      reactionContent = "👍";
+
+    let reactionContent=nostrEv.content;
+    if(reactionContent==="+"){
+        reactionContent="☆"
+    }else if(reactionContent===""||reactionContent===undefined){
+        reactionContent="👍"
     }
-    const contentSpan = document.createElement("span");
-    contentSpan.textContent = " " + reactionContent + " ";
+    const contentSpan=document.createElement("span");
+    contentSpan.textContent=" "+reactionContent+" ";
     view.appendChild(contentSpan);
-    
+
     const eTag = findTagWithValue(
-    nostrEv.tags,
-    'e', // 1: 探したいタグの名前は 'e' (イベントID)
-    undefined, // 2: タグの値（3番目の要素）は問わないので undefined
-    tag => typeof tag[1] === 'string' // 3: 2番目の要素が文字列（ID）であることを確認
-      );
-    
+        nostrEv.tags,
+        'e', // 'e'タグを探す
+        undefined, 
+        tag => typeof tag[1] === 'string' // 2番目の要素が文字列（イベントID）であるという条件
+    );
     const reactedEventId = eTag ? eTag[1] : undefined;
-    
-    if (reactedEventId) {
-      const nevent = window.NostrTools.nip19.neventEncode({
-        id: reactedEventId,
-        relays: ["wss://relay.nostr.band"]
-      });
-      const link = externalLink(`https://ompomz.github.io/tweetsrecap/tweet?id=${nevent}`, `元の投稿を見る`);
-      view.appendChild(document.createTextNode(" "));
-      view.appendChild(link);
+
+    if(reactedEventId){
+        const nevent=window.NostrTools.nip19.neventEncode({id:reactedEventId,relays:["wss://relay.nostr.band"]});
+        const link=externalLink(`${TWEET_RECAP_URL_BASE}${nevent}`,`元の投稿を見る`);
+        view.appendChild(document.createTextNode(" "));
+        view.appendChild(link)
     }
-    const originalPostContainer = document.createElement('div');
+
+    const originalPostContainer=document.createElement('div');
     originalPostContainer.classList.add('original-post-preview');
-    originalPostContainer.id = `original-post-${nostrEv.id}`;
-    originalPostContainer.setAttribute('data-event-id', reactedEventId);
+    originalPostContainer.id=`original-post-${nostrEv.id}`;
+    originalPostContainer.setAttribute('data-event-id',reactedEventId);
     view.appendChild(document.createElement('br'));
     view.appendChild(originalPostContainer);
-    if (reactedEventId) {
-      originalPostContainer.textContent = `元の投稿を取得中... (nostr:${reactedEventId.substring(0, 8)}...)`;
-      originalPostContainer.classList.add('loading');
-      originalPostContainer.classList.add('nostr-ref');
-      fetchAndDisplayOriginalPost(reactedEventId);
-    } else {
-      originalPostContainer.textContent = "元の投稿が見つかりません。";
-      originalPostContainer.classList.add('nostr-ref');
+
+    if(reactedEventId){
+        originalPostContainer.textContent=`元の投稿を取得中... (nostr:${reactedEventId.substring(0, 8)}...)`;
+        originalPostContainer.classList.add('loading');
+        originalPostContainer.classList.add('nostr-ref');
+        fetchAndDisplayOriginalPost(reactedEventId);
+    }else{
+        originalPostContainer.textContent="元の投稿が見つかりません。";
+        originalPostContainer.classList.add('nostr-ref');
     }
+    
     return view;
-  }
+}
 
   // ==== メインのロジック部分 ====
   const timeline = document.getElementById("timeline");
