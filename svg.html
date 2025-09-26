@@ -5,31 +5,29 @@
   <title>Nostrプロフィール取得ツール</title>
   <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.1.2/lib/nostr.bundle.min.js"></script>
   <style>
-    textarea, button { margin: 5px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 5px; text-align: left; }
-    th button { margin-left: 10px; }
+    textarea, button { margin: 0.5rem; padding: 0.25rem; }
+    table { border-collapse: collapse; width: 90%; }
+    th, td { border: 1px solid #ccc; padding: 0.25rem; text-align: left; }
+    th button { margin:0rem 0.5rem 0rem 0.5rem; }
   </style>
 </head>
 <body>
-  <h2>Nostrプロフィール取得ツール</h2>
-  <textarea id="pubkey-input" rows="4" cols="80" placeholder="hexまたはnpubを改行またはカンマで区切って入力"></textarea>
-  <br>
-  <button onclick="getProfiles()">プロフィール取得 (kind:0)</button>
-
-  <table id="profile-table">
-    <thead>
-      <tr>
-        <th>name <button onclick="copyColumn(0)">すべてコピー</button></th>
-        <th>display_name <button onclick="copyColumn(1)">すべてコピー</button></th>
-        <th>hex <button onclick="copyColumn(2)">すべてコピー</button></th>
-        <th>npub <button onclick="copyColumn(3)">すべてコピー</button></th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <script>
+<h4>kind:0取得</h4>
+<textarea id="pubkey-input" rows="4" cols="80" placeholder="hexまたはnpubを改行またはカンマで区切って入力"></textarea>
+<br>
+<button onclick="getProfiles()">取得</button>
+<table id="profile-table">
+<thead>
+<tr>
+<th>name<button onclick="copyColumn(0)">コピー</button></th>
+<th>display_name<button onclick="copyColumn(1)">コピー</button></th>
+<th>hex<button onclick="copyColumn(2)">コピー</button></th>
+<th>npub<button onclick="copyColumn(3)">コピー</button></th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+<script>
     const relayURL = "wss://relay.nostr.band";
 
     function decodeNpub(npub) {
