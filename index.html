@@ -1,1 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>onewaybox</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; background: #f9f9f9; }
+    textarea { width: 100%; height: 100px; margin-bottom: 1em; padding: 0.5rem; }
+    button { padding: 0.5em 1em; font-size: 1em; }
+    #status { margin-top: 1em; color: green; }
+  </style>
+</head>
+<body>
+  <h1>leave a message</h1>
+  <p>anonymous welcome</p>
+  <textarea id="message" placeholder="ｎａｎｄｅｍｏ　ｏｋａｙ"></textarea>
+  <button onclick="send()">send</button>
+  <div id="status"></div>
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script>
+async function send() {
+  const msg = document.getElementById("message").value.trim();
+  if (!msg) return alert("メッセージを入力してください");
 
+  const sk = NostrTools.generateSecretKey();
+  const pk = NostrTools.getPublicKey(sk);
+
+  // 鍵ペアをコンソールに表示（本番では消すこと！）
+  console.log("秘密鍵 (sk):", sk);
+  console.log("公開鍵 (pk):", pk);
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const event = {
+    kind: 42,
+    created_at: now,
+    pubkey: pk,
+    content: msg,
+    tags: [
+      ["e", "53197aaf441e5685655217a891cb254839d064425ee79708b097e99d1ccc0c34", "wss://relay.nostr.band", "root"]
+    ]
+  };
+
+  const signedEvent = NostrTools.finalizeEvent(event, sk);
+
+  // ここでsignedEventの中身を確認
+  console.log("署名済みイベント (signedEvent):", signedEvent);
+
+  const socket = new WebSocket("wss://relay.nostr.band");
+  socket.onopen = () => {
+    socket.send(JSON.stringify(["EVENT", signedEvent]));
+    document.getElementById("status").textContent = "送信しました！";
+    document.getElementById("message").value = "";
+    socket.close();
+  };
+  socket.onerror = () => {
+    document.getElementById("status").textContent = "送信に失敗しました…";
+  };
+}
+</script>
+</body>
+</html>
